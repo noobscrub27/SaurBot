@@ -1,0 +1,49 @@
+Move
+	Uses arguments to find and filter moves.
+	If only one move would be shown, more details are included.
+	
+Comparison operators
+	Some arguments require comparison operators.
+	If an argument says "CO", replace it with the appropriate comparison operator from below.
+    <, >   - LESS THAN and GREATER THAN
+    <=, >= - LESS THAN OR EQUAL TO and GREATER THAN OR EQUAL TO
+    =      - EQUAL TO
+	
+Argument list
+	/move start <value>
+		Shows moves with names that begin with value.
+	/move end <value>
+		Shows moves with names that end with value.
+	/move include <value>
+		Shows moves with names that include value somewhere in them.
+	/move name <value>
+		Shows moves with names that exactly match value.
+	/move type <value>
+		Shows moves that share a type with value.
+	/move vs <value1>, <value2> CO <value3>
+		value1 and value2 are Pokemon types. value3 is a number.
+		Inclusion of value2 is optional, if it is included, it be separated from value1 by a comma.
+		Shows moves that have an offensive efficacy filtered by the command operator and value3 against a Pokemon with defensive typing of value1-value2.
+		Example command: /move vs normal > 1
+		This command shows all moves that are more than x1 effective against Normal-types.
+		(all Fighting-type moves are displayed)
+		Example command: /move vs water, steel == 0.25
+		This command shows all moves that are x0.25 effective against Water/Steel-types.
+		(all Ice-type and Steel-type moves are displayed)
+	/move pp CO <value>
+		Shows moves filtered by PP.
+	/move maxpp CO <value>
+		Shows moves filtered by max PP.
+	/move accuracy CO <value>
+		Alternate spelling: acc
+		Shows moves filtered by accuracy.
+		Moves without a set accuracy are counted as having 100% accuracy.
+	/move power CO <value>
+		Alternate spelling: pow
+		Shows moves filtered by power.
+		Moves without a set power are counted as having 0 power.
+	/move category <value>
+		Alternate spelling: cat
+		Shows moves filtered by category (physical, special, status).
+	/move all
+		Shows all moves.

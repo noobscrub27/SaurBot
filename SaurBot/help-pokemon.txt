@@ -1,0 +1,65 @@
+Move
+	Uses arguments to find and filter moves.
+	If only one move would be shown by, more details are included.
+	
+Comparison operators
+	Some arguments require comparison operators.
+	If an argument says "CO", replace it with the appropriate comparison operator from below.
+    <, >   - LESS THAN and GREATER THAN
+    <=, >= - LESS THAN OR EQUAL TO and GREATER THAN OR EQUAL TO
+    =      - EQUAL TO
+	
+Special operators
+	[] - BRACKETS
+        Brackets can only be used in pokemon commands.
+        They can be used to contain a command that starts with the move or ability keyword.
+        The command contained will act as a single argument that shows any pokemon that can have at least one of the abilities/moves the encased command would show.
+		Example command: /pokemon [ability name overgrow]
+		This shows all Pokemon that can have Overgrow as their ability.
+	
+Argument list
+	/pokemon start <value>
+		Shows Pokemon with names that begin with value.
+	/pokemon end <value>
+		Shows Pokemon with names that end with value.
+	/pokemon include <value>
+		Shows Pokemon with names that include value somewhere in them.
+	/pokemon name <value>
+		Shows Pokemon with names that exactly match value.
+	/pokemon type <value>
+		Shows Pokemon that share a type with value.
+	/pokemon vs <value1> CO <value2>
+		value1 is a Pokemon type. value2 is a number.
+		Shows Pokemon filtered by defensive efficacy using the command operator and value2 against value1.
+		Example command: /pokemon vs normal == 0.25
+		This command shows all Pokemon that take x0.25 damage from Normal-type attacks.
+	/pokemon pokedex CO <value>
+		Alternate spelling: dex
+		Shows Pokemon filtered by Pokedex number.
+	/pokemon tier CO <value>
+		Shows Pokemon filtered by tier.
+		Example command: /pokemon tier >= 3A
+		Shows all Pokemon that are at least in tier 3A.
+		Example command: /pokemon tier == M1
+		Shows all Pokemon that are in mega tier 1.
+	/pokemon hp CO <value>
+		Shows Pokemon filtered by base HP.
+	/pokemon attack CO <value>
+		Alternate spelling: atk
+		Shows Pokemon filtered by base attack.
+	/pokemon defense CO <value>
+		Alternate spelling: def
+		Shows Pokemon filtered by base defense.
+	/pokemon special attack CO <value>
+		Alternate spelling: spa
+		Shows Pokemon filtered by base special attack.
+	/pokemon special defense CO <value>
+		Alternate spelling: spd
+		Shows Pokemon filtered by base special defense.
+	/pokemon speed CO <value>
+		Alternate spelling: spe
+		Shows Pokemon filtered by base speed.
+	/pokemon bst CO <calue>
+		Shows Pokemon filtered by base stat total.
+	/pokemon all
+		Shows all Pokemon.

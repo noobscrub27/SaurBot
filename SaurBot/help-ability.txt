@@ -1,0 +1,14 @@
+Ability
+	Uses arguments to find and filter abilities.
+	
+Argument list
+	/ability start <value>
+		Shows abilites with names that begin with value.
+	/ability end <value>
+		Shows abilities with names that end with value.
+	/ability include <value>
+		Shows abilities with names that include value somewhere in them.
+	/ability name <value>
+		Shows abilities with names that exactly match value.
+	/ability all
+		Shows all abilities.

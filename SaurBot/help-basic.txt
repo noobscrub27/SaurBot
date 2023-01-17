@@ -1,0 +1,64 @@
+FnF Showdown Search Basics
+	To use FnF Showdown Search, type a command to filter the data.
+	Some commands use arguments to filter the data.
+	For these commands, you can use as many arguments as you'd like to.
+	FnF Showdown Search commands are NOT case-sensitive.
+
+Some advice from SaurBot
+	FnF Showdown Search is a very powerful tool.
+	However, it can come across as confusing and intimidating to those who are unfamiliar with it.
+	To avoid attack drops and confusion damage, learn how to use FnF Showdown Search one step at a time.
+	For a step-by-step tutorial, DM SaurBot "/help tutorial"
+	
+Arguments
+	Arguments are used to specify how the data should be filtered.
+	Arguments are comprised of a keyword that instructs the program how to filter. Some arguments require additional info.
+	Example command: /pokemon name bulbasaur
+	In this command, "pokemon" is the command name. "name bulbasaur" is the argument. "name" is the keyword of the argument.
+	The name keyword tells the program to only return results with the name specified after the keyword, in this case, bulbasaur.
+	For a complete list of a command's arguments and how to use them, use that command's help command.
+
+Operators
+	Operators are the glue that holds arguments together.
+	AND/OR operators are required in all commands that use multiple arguments.
+& - AND
+	When using the AND operator, only the results that are true for both arguments are included in the filtered result.
+	Example command: move power >= 120 & type normal
+	This displays all moves that have at least 120 BP and are Normal-type.
+| - OR
+	When using the OR operator, any results that are true for either argument are included in the filtered result.
+	Example command: move power >= 120 | type normal
+	This displays all moves that have at least 120 BP, or are Normal-type, or both.
+! - NOT
+	When placed before an argument, the argument will include the opposite of what it normally would.
+	Example command: pokemon !type normal
+	This displays all Pokemon that do not have the Normal-type.
+	Note: The ! operator only works in front of normal keywords. Using them in front of parentheses or brackets will not work.
+	Incorrect: /pokemon !(type fire & type normal)
+	Correct:   /pokemon (!type fire & !type)
+() - PARANTHESES
+	Just like with math equations, arguments are processed from left to right. If you need to elevate an argument in the order of operations, surround it with parentheses.
+
+Commands
+	/help basics
+		Displays this help screen.
+	/help tutorial
+		DM-only. Starts a guided tutorial on how to effectively use the pokemon, move and ability commands.
+	/pkmn ability <arguments>
+		Uses arguments to find and filter abilites. More info: /help ability
+	/pkmn move <arguments>
+		Uses arguments to find and filter moves. More info: /help move
+	/pkmn pokemon <arguments>
+		Uses arguments to find and filter Pokemon. More info: /help pokemon
+	/pkmn random_ability <arguments>
+		Uses arguments to find and filter abilites. Returns a random ability from the list of results.
+	/pkmn random_move <arguments>
+		Uses arguments to find and filter moves. Returns a random move from the list of results.
+	/pkmn random_pokemon <arguments>
+		Uses arguments to find and filter Pokemon. Returns a random pokemon from the list of results.
+	/pkmn compare <pokemon 1>, <pokemon 2>, etc.
+		Compares the movesets of up to 12 Pokemon, separated by commas.
+	/pkmn learnset <pokemon>
+		Shows the learnset of the Pokemon.
+	/pkmn sets <pokemon>
+		Shows the samples sets of the Pokemon.

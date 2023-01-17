@@ -1,0 +1,12 @@
+__pycache__
+backups
+point logs
+wip files
+Habitat
+token.txt
+credentials-sheets.json
+guild_preferences.pickle
+user_preferences.pickle
+requirements.txt
+SaurBot.pyproj
+SaurBot.pyproj.user
