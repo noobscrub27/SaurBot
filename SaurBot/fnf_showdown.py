@@ -7,6 +7,9 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import datetime
 
+# this is the last time the FnF Showdown Search database was updated
+last_update = None
+
 def timelog(text):
     now = datetime.datetime.now()
     now_text = now.strftime("%m/%d/%y %H:%M:%S")
@@ -169,6 +172,7 @@ def add_pokemon(row):
 
 
 def update_database():
+    global last_update
     fnf_data.pokemon = {}
     fnf_data.abilities = {}
     fnf_data.moves = {}
@@ -261,6 +265,7 @@ def update_database():
         fnf_data.pokemon["Minior"].alt_form = "Minior Core form"
     except:
         print("WARNING: Could not find pokemon \"Minior\".", "(Occurred while adding Minior Core.)")
+    last_update = datetime.datetime.now()
     return "Database updated!", None
 
 class CommandPart:

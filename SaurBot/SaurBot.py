@@ -15,8 +15,6 @@ with open("token.txt", "r") as f:
     DEV_ID = int(lines[0].strip())
     TOKEN = lines[1].strip()
 
-
-TROLL_NOEL = 0
 EVIL_PLAYER_EASTER_EGG = 0.01
 intents = discord.Intents.default()
 intents.messages = True
@@ -32,6 +30,8 @@ DEFAULT_MAX_LINES = 10
 DEFAULT_MAX_CHARS = 1000
 DEFAULT_FUN = 0
 MIN_TRIGGER_LEN = 3
+# number of seconds to wait between /update commands
+UPDATE_COOLDOWN = 60
 
 def backup():
     fnf_showdown.timelog("Creating backup")
@@ -219,7 +219,6 @@ def create_guild_user_profile(guild, user_id):
     return True
 
 def check_saurbot_permissions(ctx):
-    print(ctx.author.id in guild_preferences[ctx.guild.id].saurbot_managers)
     return ctx.author.id in guild_preferences[ctx.guild.id].saurbot_managers
 
 ABOUT_SAURBOT_EMBED = discord.Embed(title="Help", color=discord.Colour.green())
@@ -657,6 +656,9 @@ async def list(ctx):
 async def update(ctx):
     try:
         if ctx.author.guild_permissions.administrator or check_saurbot_permissions(ctx):
+            if abs((datetime.datetime.now() - fnf_showdown.last_update).total_seconds()) < UPDATE_COOLDOWN:
+                await ctx.respond("The database was updated recently. Please wait a bit and try again.")
+                return
             await ctx.respond("Updating database. Commands won't work for a few seconds.")
             message, crash_text = fnf_showdown.update_database()
             await ctx.respond("Updated!")    
@@ -799,7 +801,7 @@ async def pokemon(ctx, arguments: discord.Option(str, "Enter the arguments for t
         await dm_noob(crash_text)
 
 @pkmn_commands.command(description="Search and filter abilities.")
-async def random_ability(ctx, arguments: discord.Option(str, "Enter the arguments for the command.", name="command", default="add")):
+async def random_ability(ctx, arguments: discord.Option(str, "Enter the arguments for the command.", name="command", default="all")):
     message, crash_text, response_text = fnf_showdown.create_command("ability " + arguments, get_user_tutorial_state(ctx), True)
     if ctx.channel.type is discord.ChannelType.private and response_text != "":
         user_tutorial_state[ctx.author.id] = None
@@ -811,7 +813,7 @@ async def random_ability(ctx, arguments: discord.Option(str, "Enter the argument
         await dm_noob(crash_text)
 
 @pkmn_commands.command(description="Search and filter moves.")
-async def random_move(ctx, arguments: discord.Option(str, "Enter the arguments for the command.", name="command", default="add")):
+async def random_move(ctx, arguments: discord.Option(str, "Enter the arguments for the command.", name="command", default="all")):
     message, crash_text, response_text = fnf_showdown.create_command("move " + arguments, get_user_tutorial_state(ctx), True)
     if ctx.channel.type is discord.ChannelType.private and response_text != "":
         user_tutorial_state[ctx.author.id] = None
@@ -823,7 +825,7 @@ async def random_move(ctx, arguments: discord.Option(str, "Enter the arguments f
         await dm_noob(crash_text)
 
 @pkmn_commands.command(description="Search and filter Pokemon.")
-async def random_pokemon(ctx, arguments: discord.Option(str, "Enter the arguments for the command.", name="command", default="add")):
+async def random_pokemon(ctx, arguments: discord.Option(str, "Enter the arguments for the command.", name="command", default="all")):
     message, crash_text, response_text = fnf_showdown.create_command("pokemon " + arguments, get_user_tutorial_state(ctx), True)
     if ctx.channel.type is discord.ChannelType.private and response_text != "":
         user_tutorial_state[ctx.author.id] = None
@@ -907,11 +909,6 @@ async def combo(ctx, weight: discord.Option(str, "Choose a weight class to get a
         easter_egg = random.choice(mkw_data.MKW_EASTER_EGG)
         easter_egg = easter_egg.replace("<evilplayer>", random.choice(mkw_data.MKW_EVIL_PLAYERS))
         await ctx.respond(easter_egg)
-    else:
-        if ctx.user.id == 354261385175367686 and random.random() < TROLL_NOEL:
-            character = "Funky Kong"
-            vehicle = "Flame Runner"
-        await ctx.respond(f"{character} and {vehicle}")
 
 @mkw_commands.command(description="Generates a random track.")
 async def randomtrack(ctx, track_type: discord.Option(str, "Options: vanilla, wii, retro, ctgp, ctgp custom, ctgp retro, all. Vanilla is default.", name="track_type", default="vanilla")):
@@ -920,9 +917,6 @@ async def randomtrack(ctx, track_type: discord.Option(str, "Options: vanilla, wi
         await ctx.respond("Invalid track type. Valid options are \"vanilla\" for base game tracks, \"wii\" for tracks introduced in Mario Kart Wii, \"retro\" for returning tracks in vanilla MKW, \"ctgp\" for CTGP tracks, \"ctgp retro\" for CTGP retro tracks, \"ctgp custom\" for custom CTGP tracks, and \"all\" for all tracks.")
         return
     track_type = track_type.strip()
-    if "ctgp" in track_type or track_type == "all" and ctx.user.id == 354261385175367686 and random.random() < TROLL_NOEL:
-        await ctx.respond("Mushroom Gorge")
-        return
     if random.random() < EVIL_PLAYER_EASTER_EGG:
         easter_egg = random.choice(mkw_data.MKW_EASTER_EGG)
         easter_egg = easter_egg.replace("<evilplayer>", random.choice(mkw_data.MKW_EVIL_PLAYERS))

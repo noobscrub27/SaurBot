@@ -14,7 +14,6 @@ MKW_EASTER_EGG = ["<evilplayer> is displeased.",
                   "<evilplayer> wants blood.",
                   "<evilplayer> is contemplating something...",
                   "<evilplayer> is pleased... for now.",
-                  "Everyone target Noel for this race.",
                   "<evilplayer> forgot to prepare a menacing message.",
                   "You wouldn't have liked what you got so I'm giving you another chance."]
 
