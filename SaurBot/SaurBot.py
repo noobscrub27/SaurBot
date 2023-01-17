@@ -219,7 +219,8 @@ def create_guild_user_profile(guild, user_id):
     return True
 
 def check_saurbot_permissions(ctx):
-    return ctx.author.id in guild_preferences[ctx.guild.id].profile_managers
+    print(ctx.author.id in guild_preferences[ctx.guild.id].saurbot_managers)
+    return ctx.author.id in guild_preferences[ctx.guild.id].saurbot_managers
 
 ABOUT_SAURBOT_EMBED = discord.Embed(title="Help", color=discord.Colour.green())
 ABOUT_SAURBOT_EMBED.add_field(name="About", value="SaurBot is a bot created specifically for FnF. SaurBot's biggest feature is FnF Showdown Search, which can be used to filter data from our Gen 7 Draft pet mod. However, SaurBot has other commands for Mario Kart and more. For help using FnF Showdown Search, type /tutorial, or use the other /help commands.")
@@ -249,14 +250,14 @@ async def promote(ctx, member: discord.Option(discord.Member, "The member to pro
             if ctx.guild.get_member(user_id) is None:
                 await ctx.respond(f"This user is not a part of this server.")
                 return
-            if user_id in guild_preferences[ctx.guild.id].profile_managers:
+            if user_id in guild_preferences[ctx.guild.id].saurbot_managers:
                 await ctx.respond(f"This user already has SaurBot management permissions.")
                 return
             user = bot.get_user(user_id)
             if user is None:
                 await ctx.respond(f"An unknown error occurred.")
                 return
-            guild_preferences[ctx.guild.id].profile_managers.append(user_id)
+            guild_preferences[ctx.guild.id].saurbot_managers.append(user_id)
             write_preferences()
             await ctx.respond(f"{user.display_name} was given permission to manage SaurBot settings.")
         else:
@@ -265,21 +266,21 @@ async def promote(ctx, member: discord.Option(discord.Member, "The member to pro
         await ctx.respond("You don't have permission to use this command.")
 
 @config_commands.command(description="Remove a user's permission to manage SaurBot settings. (Server owner only)")
-async def demote(ctx, user_id: discord.Option(str, "The member to demote.", name="member")):
+async def demote(ctx, member: discord.Option(discord.Member, "The member to demote.", name="member")):
     try:
         if ctx.author.guild_permissions.administrator:
             user_id = member.id
             if ctx.guild.get_member(user_id) is None:
                 await ctx.respond(f"This user is not a part of this server.")
                 return
-            if user_id not in guild_preferences[ctx.guild.id].profile_managers:
+            if user_id not in guild_preferences[ctx.guild.id].saurbot_managers:
                 await ctx.respond(f"This user doesn't have SaurBot management permissions.")
                 return
             user = bot.get_user(user_id)
             if user is None:
                 await ctx.respond(f"An unknown error occurred.")
                 return
-            guild_preferences[ctx.guild.id].profile_managers.remove(user_id)
+            guild_preferences[ctx.guild.id].saurbot_managers.remove(user_id)
             write_preferences()
             await ctx.respond(f"{user.display_name} can no longer manage profiles.")
         else:
@@ -317,7 +318,7 @@ async def set(ctx, favorite_mon: discord.Option(str, "Your favorite Pokemon. Typ
     await ctx.respond(f"Your profile has been updated.")
 
 @config_commands.command(description="Manage a member's SaurBot profile.")
-async def manage_profile(ctx, user_id: discord.Option(discord.Member, "The server member whos profile you'd like to manage.", name="member"),
+async def manage_profile(ctx, member: discord.Option(discord.Member, "The server member whos profile you'd like to manage.", name="member"),
                  favorite_mon: discord.Option(str, "Favorite Pokemon. Type 'none' to reset.", name="pokemon", default="", max_length=1024),
                  favorite_buff: discord.Option(str, "Favorite FnF Showdon buff/change/rework. Type 'none' to reset.", name="buff", default="", max_length=1024),
                  favorite_custom_mon: discord.Option(str, "Favorite FnF Showdon custom Pokemon. Type 'none' to reset.", name="custom_pokemon", default="", max_length=1024),
@@ -328,7 +329,7 @@ async def manage_profile(ctx, user_id: discord.Option(discord.Member, "The serve
     create_guild_preferences(ctx.guild)
     try:
         if ctx.author.guild_permissions.administrator or check_saurbot_permissions(ctx):
-            user_id = int(user_id)
+            user_id = member.id
             if create_guild_user_profile(ctx.guild, user_id) == False:
                 await ctx.respond(f"That user is not a member of this server.")
                 return
@@ -359,7 +360,7 @@ async def manage_profile(ctx, user_id: discord.Option(discord.Member, "The serve
         await ctx.respond("You don't have permission to use this command.")
 
 @config_commands.command(description="Assign a user their shadowmon.")
-async def assign_shadowmon(ctx, user_id: discord.Option(discord.Member, "The member to receive the shadowmon.", name="member"),
+async def assign_shadowmon(ctx, member: discord.Option(discord.Member, "The member to receive the shadowmon.", name="member"),
                     species: discord.Option(str, "The species of the shadowmon.", name="species"),
                     nickname: discord.Option(str, "The nickname of the shadowmon.", name="nickname"),
                     purified: discord.Option(bool, "Whether the shadowmon has been purified.", name="purified"),
@@ -385,8 +386,8 @@ async def assign_shadowmon(ctx, user_id: discord.Option(discord.Member, "The mem
         await ctx.respond("You don't have permission to use this command.")
 
 @config_commands.command(description="Give a user points.")
-async def point_add(ctx, user_id: discord.Option(str, "The member to receive the points.", name="member"),
-                    amount: discord.Option(int, "The amount of points to add.", name="amount", min_value=1, default=1)):
+async def point_add(ctx, member: discord.Option(discord.Member, "The member to receive the points.", name="member"),
+                    amount: discord.Option(int, "The amount of points to add.", name="amount", min_value=1)):
     create_guild_preferences(ctx.guild)
     try:
         if ctx.author.guild_permissions.administrator or check_saurbot_permissions(ctx):
@@ -411,8 +412,8 @@ async def point_add(ctx, user_id: discord.Option(str, "The member to receive the
         await ctx.respond("You don't have permission to use this command.")
 
 @config_commands.command(description="Take points from a user.")
-async def point_subtract(ctx, user_id: discord.Option(str, "The member to lose the points.", name="member"),
-                    amount: discord.Option(int, "The amount of points to remove.", name="amount", min_value=1, default=1)):
+async def point_subtract(ctx, member: discord.Option(discord.Member, "The member to lose the points.", name="member"),
+                    amount: discord.Option(int, "The amount of points to remove.", name="amount", min_value=1)):
     create_guild_preferences(ctx.guild)
     try:
         if ctx.author.guild_permissions.administrator or check_saurbot_permissions(ctx):
@@ -440,7 +441,7 @@ async def point_subtract(ctx, user_id: discord.Option(str, "The member to lose t
         await ctx.respond("You don't have permission to use this command.")
 
 @config_commands.command(description="Set a user's points.")
-async def point_override(ctx, user_id: discord.Option(str, "The member that will have their points set.", name="member"),
+async def point_override(ctx, member: discord.Option(discord.Member, "The member that will have their points set.", name="member"),
                     amount: discord.Option(int, "The amount of points to set to.", name="amount")):
     create_guild_preferences(ctx.guild)
     try:
