@@ -2,18 +2,23 @@
 import fnf_showdown
 import pickle
 import random
-from io import StringIO
+from io import StringIO, BytesIO
 import mkw_data
 import schedule
 import time
 import datetime
 import os
 import threading
+import fnf_data
+
 
 with open("token.txt", "r") as f:
     lines = f.readlines()
     DEV_ID = int(lines[0].strip())
     TOKEN = lines[1].strip()
+
+with open("chatot.txt", "r") as f:
+    CHATOT = f.read()
 
 EVIL_PLAYER_EASTER_EGG = 0.01
 intents = discord.Intents.default()
@@ -68,7 +73,7 @@ def write_preferences(guild_file='guild_preferences.pickle', user_file='user_pre
 
 def update_point_log(guild_id, user, old_points, new_points, change_type):
     file_name = os.path.join("point logs", str(guild_id) + ".txt")
-    with open(file_name, "a") as f:
+    with open(file_name, "a", encoding="utf-8") as f:
         text = str(user.id) + " (" + user.display_name + "):"
         text += " " + str(old_points) + " -> " + str(new_points) + " (" + change_type + ")\n"
         f.write(text)
@@ -763,76 +768,112 @@ async def tutorial(ctx, tutorial: discord.Option(str, "Enter a tutorial name. If
         await ctx.respond("This command is DM-only.")
 
 @pkmn_commands.command(description="Search and filter abilities.")
-async def ability(ctx, arguments: discord.Option(str, "Enter the arguments for the command.", name="command")):
-    message, crash_text, response_text = fnf_showdown.create_command("ability " + arguments, get_user_tutorial_state(ctx), False)
+async def ability(ctx, arguments: discord.Option(str, "Enter the arguments for the command.", name="command"), mobile: discord.Option(bool, "Returns an image instead of text for mobile users.", name="mobile", default=False)):
+    message, crash_text, response_text = fnf_showdown.create_command("ability " + arguments, get_user_tutorial_state(ctx), False, mobile)
     if ctx.channel.type is discord.ChannelType.private and response_text != "":
         user_tutorial_state[ctx.author.id] = None
         write_preferences()
     else:
         response_text = ""
-    await ctx.respond(response_text, file=turn_into_file(message))
+    if mobile:
+        with BytesIO() as image:
+            message.save(image, "PNG")
+            image.seek(0)
+            await ctx.respond(response_text, file=discord.File(fp=image, filename='image.png'))
+    else:
+        await ctx.respond(response_text, file=turn_into_file(message))
     if crash_text is not None:
         await dm_noob(crash_text)
 
 @pkmn_commands.command(description="Search and filter moves.")
-async def move(ctx, arguments: discord.Option(str, "Enter the arguments for the command.", name="command")):
+async def move(ctx, arguments: discord.Option(str, "Enter the arguments for the command.", name="command"), mobile: discord.Option(bool, "Returns an image instead of text for mobile users.", name="mobile", default=False)):
     #await ctx.respond("test")
-    message, crash_text, response_text = fnf_showdown.create_command("move " + arguments, get_user_tutorial_state(ctx), False)
+    message, crash_text, response_text = fnf_showdown.create_command("move " + arguments, get_user_tutorial_state(ctx), False, mobile)
     if ctx.channel.type is discord.ChannelType.private and response_text != "":
         user_tutorial_state[ctx.author.id] = None
         write_preferences()
     else:
         response_text = ""
-    await ctx.respond(response_text, file=turn_into_file(message))
+    if mobile:
+        with BytesIO() as image:
+            message.save(image, "PNG")
+            image.seek(0)
+            await ctx.respond(response_text, file=discord.File(fp=image, filename='image.png'))
+    else:
+        await ctx.respond(response_text, file=turn_into_file(message))
     if crash_text is not None:
         await dm_noob(crash_text)
 
 @pkmn_commands.command(description="Search and filter Pokemon.")
-async def pokemon(ctx, arguments: discord.Option(str, "Enter the arguments for the command.", name="command")):
+async def pokemon(ctx, arguments: discord.Option(str, "Enter the arguments for the command.", name="command"), mobile: discord.Option(bool, "Returns an image instead of text for mobile users.", name="mobile", default=False)):
     #await ctx.respond("test")
-    message, crash_text, response_text = fnf_showdown.create_command("pokemon " + arguments, get_user_tutorial_state(ctx), False)
+    message, crash_text, response_text = fnf_showdown.create_command("pokemon " + arguments, get_user_tutorial_state(ctx), False, mobile)
     if ctx.channel.type is discord.ChannelType.private and response_text != "":
         user_tutorial_state[ctx.author.id] = None
         write_preferences()
     else:
         response_text = ""
-    await ctx.respond(response_text, file=turn_into_file(message))
+    if mobile:
+        with BytesIO() as image:
+            message.save(image, "PNG")
+            image.seek(0)
+            await ctx.respond(response_text, file=discord.File(fp=image, filename='image.png'))
+    else:
+        await ctx.respond(response_text, file=turn_into_file(message))
     if crash_text is not None:
         await dm_noob(crash_text)
 
 @pkmn_commands.command(description="Search and filter abilities.")
-async def random_ability(ctx, arguments: discord.Option(str, "Enter the arguments for the command.", name="command", default="all")):
-    message, crash_text, response_text = fnf_showdown.create_command("ability " + arguments, get_user_tutorial_state(ctx), True)
+async def random_ability(ctx, arguments: discord.Option(str, "Enter the arguments for the command.", name="command", default="all"), mobile: discord.Option(bool, "Returns an image instead of text for mobile users.", name="mobile", default=False)):
+    message, crash_text, response_text = fnf_showdown.create_command("ability " + arguments, get_user_tutorial_state(ctx), True, mobile)
     if ctx.channel.type is discord.ChannelType.private and response_text != "":
         user_tutorial_state[ctx.author.id] = None
         write_preferences()
     else:
         response_text = ""
-    await ctx.respond(response_text, file=turn_into_file(message))
+    if mobile:
+        with BytesIO() as image:
+            message.save(image, "PNG")
+            image.seek(0)
+            await ctx.respond(response_text, file=discord.File(fp=image, filename='image.png'))
+    else:
+        await ctx.respond(response_text, file=turn_into_file(message))
     if crash_text is not None:
         await dm_noob(crash_text)
 
 @pkmn_commands.command(description="Search and filter moves.")
-async def random_move(ctx, arguments: discord.Option(str, "Enter the arguments for the command.", name="command", default="all")):
-    message, crash_text, response_text = fnf_showdown.create_command("move " + arguments, get_user_tutorial_state(ctx), True)
+async def random_move(ctx, arguments: discord.Option(str, "Enter the arguments for the command.", name="command", default="all"), mobile: discord.Option(bool, "Returns an image instead of text for mobile users.", name="mobile", default=False)):
+    message, crash_text, response_text = fnf_showdown.create_command("move " + arguments, get_user_tutorial_state(ctx), True, mobile)
     if ctx.channel.type is discord.ChannelType.private and response_text != "":
         user_tutorial_state[ctx.author.id] = None
         write_preferences()
     else:
         response_text = ""
-    await ctx.respond(response_text, file=turn_into_file(message))
+    if mobile:
+        with BytesIO() as image:
+            message.save(image, "PNG")
+            image.seek(0)
+            await ctx.respond(response_text, file=discord.File(fp=image, filename='image.png'))
+    else:
+        await ctx.respond(response_text, file=turn_into_file(message))
     if crash_text is not None:
         await dm_noob(crash_text)
 
 @pkmn_commands.command(description="Search and filter Pokemon.")
-async def random_pokemon(ctx, arguments: discord.Option(str, "Enter the arguments for the command.", name="command", default="all")):
-    message, crash_text, response_text = fnf_showdown.create_command("pokemon " + arguments, get_user_tutorial_state(ctx), True)
+async def random_pokemon(ctx, arguments: discord.Option(str, "Enter the arguments for the command.", name="command", default="all"), mobile: discord.Option(bool, "Returns an image instead of text for mobile users.", name="mobile", default=False)):
+    message, crash_text, response_text = fnf_showdown.create_command("pokemon " + arguments, get_user_tutorial_state(ctx), True, mobile)
     if ctx.channel.type is discord.ChannelType.private and response_text != "":
         user_tutorial_state[ctx.author.id] = None
         write_preferences()
     else:
         response_text = ""
-    await ctx.respond(response_text, file=turn_into_file(message))
+    if mobile:
+        with BytesIO() as image:
+            message.save(image, "PNG")
+            image.seek(0)
+            await ctx.respond(response_text, file=discord.File(fp=image, filename='image.png'))
+    else:
+        await ctx.respond(response_text, file=turn_into_file(message))
     if crash_text is not None:
         await dm_noob(crash_text)
 
@@ -874,6 +915,10 @@ async def debug(ctx):
     else:
         await ctx.respond("You don't have permission to use this command.")
 
+@pkmn_commands.command(description="I DON'T THINK YOU REALIZE HOW ANNOYING YOU MADE THIS BIRD.")
+async def dadave(ctx):
+    await ctx.respond(CHATOT)
+
 @mkw_commands.command(name="random", description="Generates a random character/vehicle combo.")
 async def combo(ctx, weight: discord.Option(str, "Choose a weight class to get a character/vehicle combo of that weight class.", name="weight", default=""), vehicle: discord.Option(str, "Choose a vehicle type to get a character/vehicle combo with that vehicle type.", name="vehicle", default="")):
     if weight.strip().lower() == "light":
@@ -909,6 +954,8 @@ async def combo(ctx, weight: discord.Option(str, "Choose a weight class to get a
         easter_egg = random.choice(mkw_data.MKW_EASTER_EGG)
         easter_egg = easter_egg.replace("<evilplayer>", random.choice(mkw_data.MKW_EVIL_PLAYERS))
         await ctx.respond(easter_egg)
+    else:
+        await ctx.respond(f"{character} on the {vehicle}")
 
 @mkw_commands.command(description="Generates a random track.")
 async def randomtrack(ctx, track_type: discord.Option(str, "Options: vanilla, wii, retro, ctgp, ctgp custom, ctgp retro, all. Vanilla is default.", name="track_type", default="vanilla")):
@@ -938,7 +985,8 @@ async def randomtrack(ctx, track_type: discord.Option(str, "Options: vanilla, wi
         track = random.choice(mkw_data.VANILLA_WII + mkw_data.VANILLA_RETRO + mkw_data.CTGP_CUSTOM + mkw_data.CTGP_RETRO)
     await ctx.respond(track)
 
-@mkw_commands.command(description="Get the MKW friend codes of another member of the server.")
+'''
+@profile_commands.command(description="Get the MKW friend codes of another member of the server.")
 async def viewfc(ctx, user: discord.Option(str, "Type a username (eg. SaurBot#8585) to see their saved friend code. Case-sensitive!", name="username")):
     try:
         user = user.split("#")
@@ -969,8 +1017,9 @@ async def viewfc(ctx, user: discord.Option(str, "Type a username (eg. SaurBot#85
         await ctx.respond("This user is not a member of this server.")
     elif fail_flag == 2:
         await ctx.respond("This user has not submitted a friend code.")
+'''
 
-@mkw_commands.command(description="Add a MKW friend code to SaurBot's database so others can easily add you.")
+@profile_commands.command(description="Add a MKW friend code to SaurBot's database so others can easily add you.")
 async def addfc(ctx, friend_code: discord.Option(str, "Type your friend code.", name="friend_code")):
     error_flag = False
     # if the FC was formatted XXXX-XXXX-XXXX
@@ -1000,8 +1049,8 @@ async def addfc(ctx, friend_code: discord.Option(str, "Type your friend code.", 
         await ctx.respond("Invalid friend code.")
     else:
         if ctx.author.id in user_mkw_fc:
-            if len(user_mkw_fc[ctx.author.id]) > 8:
-                await ctx.respond("You cannot store more than eight friend codes. Use /mkw removefc to delete one and try again.")
+            if len(user_mkw_fc[ctx.author.id]) > 4:
+                await ctx.respond("You cannot store more than four friend codes. Use /mkw removefc to delete one and try again.")
                 return
             else:
                 user_mkw_fc[ctx.author.id].append(friend_code)
@@ -1010,7 +1059,7 @@ async def addfc(ctx, friend_code: discord.Option(str, "Type your friend code.", 
         write_preferences()
         await ctx.respond(f"Added {friend_code}.")
 
-@mkw_commands.command(description="Remove one of your MKW friend codes from SaurBot's database.")
+@profile_commands.command(description="Remove one of your MKW friend codes from your SaurBot's profile.")
 async def removefc(ctx, fc_index: discord.Option(int, "Enter the number associated with the code to remove. (Viewed with /mkw viewfc) Default: 1", name="friend_code_index", default=1, max_value=8, min_value=1)):
     if ctx.author.id in user_mkw_fc:
         if len(user_mkw_fc[ctx.author.id]) < fc_index:
@@ -1038,6 +1087,8 @@ async def on_message(message):
                         fnf_showdown.timelog("Easter egg!")
     except AttributeError:
         return
+
+    
 
 schedule.every().day.at("00:00").do(backup)
 def schedule_backup_save():

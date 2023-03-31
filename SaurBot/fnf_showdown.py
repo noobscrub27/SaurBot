@@ -10,14 +10,24 @@ import datetime
 # this is the last time the FnF Showdown Search database was updated
 last_update = None
 
+def asciinator(text):
+    return text.replace("é", "e")
+
+def make_mobile_list(data):
+    result = ""
+    for thing in data:
+        result += thing.name + ", "
+    return asciinator(result[:-2])
+
 def timelog(text):
     now = datetime.datetime.now()
     now_text = now.strftime("%m/%d/%y %H:%M:%S")
     print(now_text + " - " + text) 
 
-def create_command(command, tutorial=None, rand=False):
+def create_command(command, tutorial=None, rand=False, mobile=False):
     timelog("A Command object was created.")
-    command_object = Command(command, rand)
+    print(f"create_command {mobile}")
+    command_object = Command(command, rand, False, mobile)
     command_object.run_command()
     response_text = ""
     if command_object.success:
@@ -38,6 +48,8 @@ def create_command(command, tutorial=None, rand=False):
             response_text = "You are almost finished! There's just one tutorial left, and it's about the most powerful feature I have. The last tutorial is the \"subcommands\" tutorial."
         elif tutorial == "subcommands" and command_object.command_type == "pokemon" and len([command_part for command_part in command_object.command_parts if command_part.part_type == "subcommand"]):
             response_text = "Congratulations! You now know all you need to filter data like a pro!"
+    if command_object.mobile:
+        return command_object.output, command_object.error_log, response_text
     return command_object.output.replace("é", "e"), command_object.error_log, response_text
 
 # SETUP
@@ -156,7 +168,7 @@ def add_pokemon(row):
         for move in fnf_data.page_learnsets[name]:
             pkmn_moves.append(fnf_data.moves[move])
     except KeyError:
-        print("WARNING: Could not find move or learnset. (Occurred while processing moves for", str(name) + ")")
+        print(f"WARNING: Could not find move or learnset. KeyError: \"{move}\". (Occurred while processing moves for", str(name) + ")")
     changes = row["Changes"]
     sets = []
     for i in [[row["Set 1"], row["1D"]], [row["Set 2"], row["2D"]], [row["Set 3"], row["3D"]]]:
@@ -279,7 +291,21 @@ class CommandPart:
             return self.contents
 
 class Command:
-    def __init__(self, command, rand):
+    def __init__(self, command, rand=False, backup=False, mobile=False):
+        self.mobile = mobile
+        print(f"Command {mobile}")
+        if backup == False:
+            if command.startswith("ability"):
+                new_command = "ability name" + command.removeprefix("ability")
+            elif command.startswith("move"):
+                new_command = "move name" + command.removeprefix("move")
+            elif command.startswith("pokemon"):
+                new_command = "pokemon name" + command.removeprefix("pokemon")
+            self.backup_command = Command(new_command, rand, True, mobile)
+            self.backup = False
+        else:
+            self.backup_command = None
+            self.backup = True
         self.output = ""
         self.success = False
         self.error_log = None
@@ -290,7 +316,7 @@ class Command:
         # when random is true a random pokemon that fits the command output is returned.
         self.random = rand
         # command_text is the version of the command that will be displayed to the user at the end
-        self.command_text = "/" + self.command + "\n\n"
+        self.command_text = "/pkmn " + ("" if rand == False else "random_") + self.command + "\n\n"
         # answer is the version of the command that is used for the bulk of the work
         self.answer = self.command.lower().strip()
         # command type (pokemon, move, ability, etc.)
@@ -552,23 +578,30 @@ class Command:
     def format_results(self):
         self.log_function_call("format_results")
         text = self.command_text
+        image = None
         if len(self.results.data) == 1:
             if self.command_type == "ability":
                 text += self.results.data[0].to_string_one_line()
             else:
                 text += self.results.data[0].to_string()
+            if self.mobile:
+                image = fnf_data.make_image(asciinator(self.results.data[0].to_image_text()), 72, True)
         elif len(self.results.data) > 1:
             if self.command_type == "pokemon":
                 self.results.data = sorted(self.results.data, key=lambda data: data.pokedex)
             elif self.command_type in ["ability", "move"]:
                 self.results.data = sorted(self.results.data, key=lambda data: data.name.lower())
+            if self.mobile:
+                image = fnf_data.make_image(make_mobile_list(self.results.data), 72, True)
             for i in self.results.data:
                 text += i.to_string_one_line() + "\n"
             text = text[:-1]
         else:
             text += "No results found."
+            if self.mobile:
+                image = fnf_data.make_image(text, 72, True)
         self.log_function_end()
-        return text
+        return text, image
         
     def run_command(self):
         self.log_function_call("run_command")
@@ -720,8 +753,11 @@ class Command:
             self.results = self.results.arguments[0]
             if self.random:
                 self.results.data = [random.choice(self.results.data)]
-            results_text = self.format_results()
-            self.output = results_text
+            results_text, results_image = self.format_results()
+            if self.mobile:
+                self.output = results_image
+            else:
+                self.output = results_text
             self.success = True
             self.log_function_end()
             return
@@ -738,7 +774,17 @@ class Command:
             if debug_mode:
                 self.create_and_send_error_log(e, True)
             else:
-                self.output += e.description
+                if self.backup == False:
+                    self.backup_command.run_command()
+                    self.output += e.description
+                    if self.backup_command.success:
+                        self.output += f"\nTrying {self.backup_command.output}"
+                        if self.mobile:
+                            self.output = self.backup_command.output
+                else:
+                    self.output += e.description
+                    if self.mobile:
+                        self.output = fnf_data.make_image(asciinator(self.output))
                 timelog("An exception was raised intentionally.")
         # otherwise, the exception is passed to the root command
         else:

@@ -1,10 +1,20 @@
 import re
+from PIL import Image, ImageFont, ImageDraw
+import textwrap
 
 POKEMON_MAX_LENGTH = 23
 MOVE_MAX_LENGTH = 30
 ABILITY_MAX_LENGTH = 20
 STAT_MAX_LENGTH = 30
 TYPE_MAX_LENGTH = 12
+
+# size: [rows, chars]
+FONT_SIZES = {36: [27, 91],
+              48: [22, 68],
+              60: [18, 54],
+              72: [15, 45]}
+# 36 90/27
+# 
 
 NOT_VERY_EFFECTIVE_TEXT = ["0.5", "x0.5", "*0.5", "1/2", "x1/2", "*1/2"]
 DOUBLE_NOT_VERY_EFFECTIVE_TEXT = ["0.25", "x0.25", "*0.25", "1/4", "x1/4", "*1/4"]
@@ -44,6 +54,38 @@ def multiply_list(l):
     for i in l:
         result *= i
     return result
+
+def wrap(text, font_size=36, mobile=False):
+    initial_lines = text.split("\n")
+    output = []
+    for line in initial_lines:
+        split_lines = textwrap.wrap(line, width=FONT_SIZES[font_size][1], break_long_words=False, replace_whitespace=False)
+        for split_line in split_lines:
+            output.append(split_line)
+    if len(output) > FONT_SIZES[font_size][0] and mobile:
+        output = output[:FONT_SIZES[font_size][0]-2]
+        output.append("Full results not shown. Use Mobile=False to view full results.\n")
+    result = ""
+    for line in output:
+        result += line + "\n"
+    return result
+
+def make_image(text, font_size=60, reduce_if_needed=True):
+    img = Image.open("blank_image1920x1080.png")
+    if reduce_if_needed:
+        sizes = [72,60,48,36]
+        for size in sizes:
+            if size > font_size:
+                del size
+        for size in sizes:
+            if wrap(text, size, True).strip().endswith("Use Mobile=False to view full results.") == False:
+                break
+
+    font = ImageFont.truetype("cascadia-code/Cascadia.ttf", size)
+
+    draw = ImageDraw.Draw(img)
+    draw.text((0,0), wrap(text, size, True).strip(), (255, 255, 255), font=font)
+    return img
 
 class Pokemon:
     def __init__(self, name = "none", types = [], abilities = [], pokedex = 0, tier = "", stats = [0,0,0,0,0,0,0], buffs = "", moves = [], changes = "N/A", sets = []):
@@ -109,7 +151,7 @@ class Pokemon:
         for num in mu_numbers:
             mu_list = [list(mu.keys())[0].name for mu in self.matchups if list(mu.values())[0] == num]
             if mu_list:
-                result += "\n\tDamage x" + str(num) + (" " * (4 - len(str(num)))) + ": "
+                result += "\nDamage x" + str(num) + (" " * (4 - len(str(num)))) + ": "
                 for mu in mu_list:
                     result += (mu + ", ") if mu not in ["Shadow", "Typeless"] else ""
             if result [-2:] == ", ":
@@ -123,9 +165,10 @@ class Pokemon:
         if self.changes != "N/A":
             result += "\nChanges:\n" + self.changes
         result += "\n\nRelated commands:"
-        result += "\nView learnset: \"/learnset " + self.name + "\""
-        result += "\nView sample sets: \"/sets " + self.name + "\""
-        return result
+        result += "\nView learnset: \"/pkmn learnset " + self.name + "\""
+        result += "\nView sample sets: \"/pkmn sets " + self.name + "\""
+        
+        return wrap(result)
 
     def to_string_moves(self):
         result = ""
@@ -187,6 +230,9 @@ class Pokemon:
         result += ("\n*" + self.notes) if self.notes else ""
         return result
 
+    def to_image_text(self):
+        return self.to_string()
+
 
 class Move:
     def __init__(self, name = "", pkmn_type = None, category = "Status", power = 0, accuracy = 0, pp = 0, description = 0, buff = 0):
@@ -220,6 +266,25 @@ class Move:
 
         return result
 
+    def to_image_text(self):
+        # name
+        result = self.name + (" " * (MOVE_MAX_LENGTH - len(self.name)))
+        # type
+        result += "\nType: " + self.type.name
+        # category
+        result += "\nCategory: " + self.category
+        # power
+        result += "\nPower: " + str(self.power)
+        # accuracy
+        result += "\nAccuracy: " + str(self.accuracy) + "%"
+        # PP
+        result += "\nPP: " + str(self.pp)
+        result += " " if self.pp < 10 else ""
+        result += " (max: " + str(self.max_pp) + ")"
+        # description
+        result += "\n" + self.description
+        return result
+
 class Ability:
     def __init__(self, name = "", description = ""):
         self.name = name
@@ -230,6 +295,9 @@ class Ability:
 
     def to_string(self):
         return self.to_string_one_line()
+
+    def to_image_text(self):
+        return f"{self.name}\n{self.description}"
 
 class Type:
     def __init__(self, name = ""):
@@ -244,6 +312,9 @@ class Sample_Set:
 
     def to_string(self):
         return (self.sample_set + "\n" + self.description)
+
+    def to_image(self):
+        return make_image(self.to_string())
 
 # This class contains one or more Arguments.
 # It is responsible for keeping track of how the contained Arguments should be combined with other Arguments
