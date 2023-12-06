@@ -22,6 +22,8 @@ BACK_SHINY_SPRITES_URL = ""
 DEX_SPRITES_URL = ""
 DEX_SHINY_SPRITES_URL = ""
 
+MOBILE_IMAGE_WARNING = "Full results not shown. To see the rest, use a different view mode."
+
 commands_locked = False
 currently_updating = False
 
@@ -60,10 +62,16 @@ POKEDEX_COLORS = {"red": "#e60033",
                   }
 
 # size: [rows, chars]
+''' old font sizes
 FONT_SIZES = {36: [27, 91],
               48: [22, 68],
               60: [18, 54],
               72: [15, 45]}
+'''
+FONT_SIZES = {36: [25, 91],
+              48: [20, 68],
+              60: [16, 54],
+              72: [13, 45]}
 # 36 90/27
 # 
 
@@ -1493,7 +1501,7 @@ class Pokemon(DexData):
             simplified_img_file = saurbot_functions.only_a_to_z(img_file.removesuffix(".png"))
             found_sprite = False
             for alias in [name for name in self.aliases if name not in simplified_cosmetic_forms]:
-                if (simplified_img_file == alias+"f" or simplified_img_file+"totem" == alias+"f") and self.name != "Unown":
+                if (simplified_img_file == alias+"f" or simplified_img_file+"totem" == alias+"f") and self.name not in ["Unown", "Pyroar", "Nidoran", "Unfezant"]:
                     has_gender_difference = True
                     female_sprites_dict["Female Front"] = FRONT_SPRITES_URL + img_file
                     female_sprites_dict["Female Back"] = BACK_SPRITES_URL + img_file
@@ -1636,15 +1644,15 @@ class Pokemon(DexData):
         self.text_values["file stats"] = ""
         for stat in self.stats:
             self.text_values["embed stats"] += f"{stat}: {self.stats[stat]}"
-            self.text_values["file stats"] += f"\t{stat}: {self.stats[stat]}"
+            self.text_values["file stats"] += f"{stat}: {self.stats[stat]}"
             if stat != "BST":
                 self.text_values["embed stats"] += "\n"
-                self.text_values["file stats"] += "\n"
+                self.text_values["file stats"] += ", "
         self.text_values["padded dex"] = padding(str(self.dex), 5)
         ladder_tier = "NONE" if self.ladder_tier == "UNTIERED" else self.ladder_tier
         draft_tier = "BAN" if self.tier == "BANNED" else self.tier
         draft_tier = f"({draft_tier})"
-        self.text_values["padded tiers"] = f"{padding(ladder_tier, 5)} {padding(draft_tier, 4)}"
+        self.text_values["padded tiers"] = f"{padding(ladder_tier, 5)} {padding(draft_tier, 8)}"
         self.text_values["padded type"] = padding(self.text_values["type"], 18)
         weakness_text = ""
         resistance_text = ""
@@ -1780,20 +1788,19 @@ class Pokemon(DexData):
         if self.text_values["weakness"] != "":
             text += f"Weaknesses: {self.text_values['weakness']}\n"
         if self.text_values["resistance"] != "":
-            text += f"Weaknesses: {self.text_values['resistance']}\n"
+            text += f"Resistances: {self.text_values['resistance']}\n"
         if self.text_values["immunity"] != "":
-            text += f"Weaknesses: {self.text_values['immunity']}\n"
-        text += self.text_values["stats"] + "\n"
-        text += f"Stats: {self.text_values['file stats']}\n"
+            text += f"Immunities: {self.text_values['immunity']}\n"
+        text += self.text_values["file stats"] + "\n"
         text += f"Abilities: {self.text_values['abilities']}\n"
         text += f"Gender ratio: {self.text_values['gender']}\n"
         text += f"Egg groups: {self.text_values['egg groups']}\n"
-        text += f"Height: {self.heightm}m"
-        text += f"Height: {self.text_values['weight']}\n"
+        text += f"Height: {self.heightm}m\n"
+        text += f"Weight: {self.text_values['weight']}\n"
         text += f"Power of Heavy Slam used by {self.name} (Base Power: opponent's weight):\n\t{self.text_values['heavy slam outgoing']}\n"
         text += f"Power of Heavy Slam used against {self.name} (Base Power: opponent's weight):\n\t{self.text_values['heavy slam incoming']}\n"
         if self.changes != "":
-            text += f"Changes made in FnF:\n{self.changes}"
+            text += f"Changes made in FnF:\n{self.changes}\n"
         text += f"Related commands:\n{self.text_values['related commands']}"
         return text
 
@@ -2026,7 +2033,7 @@ def wrap(text, font_size=36, mobile=False):
             output.append(split_line)
     if len(output) > FONT_SIZES[font_size][0] and mobile:
         output = output[:FONT_SIZES[font_size][0]-1]
-        output.append("Full results not shown. To see the rest, use a different view mode.\n")
+        output.append(f"{MOBILE_IMAGE_WARNING}\n")
     result = ""
     for line in output:
         result += line + "\n"
@@ -2040,7 +2047,7 @@ def make_image(text, font_size=60, reduce_if_needed=True):
             if size > font_size:
                 del size
         for size in sizes:
-            if wrap(text, size, True).strip().endswith("Use Mobile=False to view full results.") == False:
+            if wrap(text, size, True).strip().endswith(MOBILE_IMAGE_WARNING) == False:
                 break
 
     font = ImageFont.truetype("cascadia-code/Cascadia.ttf", size)

@@ -67,7 +67,7 @@ class ChocolateMoonCookie(MoonCookie):
     base_calories = 195
     def __init__(self):
         super().__init__()
-        self.ingredients.append("Sweet Heart Chocoloate")
+        self.ingredients.append("Sweet Heart Chocolate")
         self.allergens.append("Dairy")
 
 class HerbalMoonCookie(MoonCookie):
