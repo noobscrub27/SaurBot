@@ -62,18 +62,11 @@ POKEDEX_COLORS = {"red": "#e60033",
                   }
 
 # size: [rows, chars]
-''' old font sizes
+
 FONT_SIZES = {36: [27, 91],
               48: [22, 68],
               60: [18, 54],
               72: [15, 45]}
-'''
-FONT_SIZES = {36: [25, 91],
-              48: [20, 68],
-              60: [16, 54],
-              72: [13, 45]}
-# 36 90/27
-# 
 
 NOT_VERY_EFFECTIVE_TEXT = ["0.5", "x0.5", "*0.5", "1/2", "x1/2", "*1/2"]
 DOUBLE_NOT_VERY_EFFECTIVE_TEXT = ["0.25", "x0.25", "*0.25", "1/4", "x1/4", "*1/4"]
@@ -1282,7 +1275,7 @@ class Move(DexData):
         pokemon_with_this_move = [mon for mon in pokemon.values() if self in mon.learnset]
         hypnomon_pokemon_with_this_move = [mon for mon in pokemon_with_this_move if mon.filter_rule_hypnomons]
         base_form_pokemon_with_this_move = [mon for mon in pokemon_with_this_move if mon.filter_rule_base_forms]
-        new_gen_pokemon_with_this_move = [mon for mon in pokemon_with_this_move if mon.filter_rule_new_gens]
+        new_gen_pokemon_with_this_move = [mon for mon in pokemon_with_this_move if mon.learns_move(self, 7) == False]
         ignored_pokemon_with_this_move = [mon for mon in pokemon_with_this_move if mon.filter_rule_ignored]
         unrevealed_pokemon_with_this_move = [mon for mon in pokemon_with_this_move if mon.filter_rule_unrevealed]
         if len(pokemon_with_this_move) == len(hypnomon_pokemon_with_this_move):
@@ -1439,20 +1432,22 @@ class Pokemon(DexData):
             base_form.check_learnset()
         if self.prevo is not None:
             for move in self.prevo.learnset:
-                if move not in self.learnset:
-                    self.learnset[move] = []
-                    for method in self.prevo.learnset[move]:
-                        evo_method = method[0] + "evo"
-                        if evo_method not in self.learnset[move]:
-                            self.learnset[move].append(evo_method)
+                for method in self.prevo.learnset[move]:
+                    evo_method = method[0] + "evo"
+                    if move in self.learnset and (method[0] in self.learnset[move] or evo_method in self.learnset[move]):
+                        continue
+                    if move not in self.learnset:
+                        self.learnset[move] = []
+                    self.learnset[move].append(evo_method)
         if base_form is not None:
             for move in base_form.learnset:
-                if move not in self.learnset:
-                    self.learnset[move] = []
-                    for method in base_form.learnset[move]:
-                        evo_method = method[0] + "form"
-                        if evo_method not in self.learnset[move]:
-                            self.learnset[move].append(evo_method)
+                for method in base_form.learnset[move]:
+                    evo_method = method[0] + "form"
+                    if move in self.learnset and (method[0] in self.learnset[move] or evo_method in self.learnset[move]):
+                        continue
+                    if move not in self.learnset:
+                        self.learnset[move] = []
+                    self.learnset[move].append(evo_method)
         self.learnset_checked = True
 
     def get_ability_list(self):
@@ -2120,7 +2115,7 @@ class PaginationView(discord.ui.View):
             self.selected_index = None
             self.selected_results = {}
         self.command_user = interaction.user
-        self.timeout = 300
+        self.timeout = 43200
         self.number_of_pages = max(math.ceil(len(self.data) / self.sep), 1)
         await interaction.response.defer()
         self.create_select_result_menu()

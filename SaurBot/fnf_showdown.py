@@ -584,23 +584,36 @@ def fuse(pokemon1, pokemon2):
     for i in possible_abilities:
         ability_text += i.name + ", "
     fusion.possible_abilities = ability_text.removesuffix(", ")
-    embed_text = ""
-    image_text = ""
-    file_text = ""
+    gen7_image_text = ""
+    gen7_file_text = ""
+    new_gen_image_text = ""
+    new_gen_file_text = ""
     len_counter = 0
-    for move in sorted(set(list(pokemon1.learnset.keys()) + list(pokemon2.learnset.keys())), key=lambda move: move.name.lower()):
+    sorted_moves = sorted(set(list(pokemon1.learnset.keys()) + list(pokemon2.learnset.keys())), key=lambda move: move.name.lower())
+    gen7_sorted_moves = [move for move in sorted_moves if pokemon1.learns_move(move, 7) or pokemon2.learns_move(move, 7)]
+    new_gen_sorted_moves = [move for move in sorted_moves if move not in gen7_sorted_moves]
+    for move in gen7_sorted_moves:
         move_name = move.name
-        if (pokemon1.learns_move(move, 7) or pokemon2.learns_move(move, 7)) == False:
-            move_name = move_name + "*"
-        image_text += move_name + ", "
+        gen7_image_text += move_name + ", "
         len_counter += len(move_name) + 2
         if len_counter > 72:
             move_name = "\n" + move_name
             len_counter = 0
-        file_text += move_name + ", "
-    fusion.text_learnset = file_text.strip().removesuffix(",")
-    fusion.image_learnset = image_text.strip().removesuffix(",")
-    fusion.embed_learnset = f"*/pokedex move filters: learned by {pokemon1.name} | learned by {pokemon2.name}*"
+        gen7_file_text += move_name + ", "
+    len_counter = 0
+    for move in new_gen_sorted_moves:
+        move_name = move.name
+        new_gen_image_text += move_name + ", "
+        len_counter += len(move_name) + 2
+        if len_counter > 72:
+            move_name = "\n" + move_name
+            len_counter = 0
+        new_gen_file_text += move_name + ", "
+    file_text = gen7_file_text.strip().removesuffix(",") + "\nNew gen only:\n" + new_gen_file_text.strip().removesuffix(",")
+    image_text = gen7_image_text.strip().removesuffix(",") + "\nNew gen only:\n" + new_gen_image_text.strip().removesuffix(",")
+    fusion.text_learnset = file_text
+    fusion.image_learnset = image_text
+    fusion.embed_learnset = f"Due to embed character limits, please use file or image view, or use the following command:\n*/pokedex move filters: learned by {pokemon1.name} | learned by {pokemon2.name}*"
     fusion.color = pokemon1.color
     fusion.get_stats_text()
     return [command_text, fusion]

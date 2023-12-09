@@ -254,7 +254,11 @@ async def help_command(interaction: discord.Interaction):
     help_view = HelpView()
     await help_view.send(interaction)
 
-# yeah idk why i named these with an underscore i like CamelCase more for classes
+@bot.tree.command(name="dadave", description="Was he right all along?")
+async def dadave_command(interaction: discord.Interaction):
+    await interaction.response.send_message(fnf_data.CHATOT)
+
+# yeah idk why I named these with an underscore I like UpperCamelCase more for classes
 # too late to change it now tho
 class User_Profile:
     def __init__(self, identifier, shadowmon = None, favorite_mon = None, favorite_story_char = None, favorite_buff = None, favorite_custom_mon = None, bointa = 0, favorite_mkw_char = None, favorite_mkw_vehicle = None, favorite_course = None, badges_obtained = 0):
