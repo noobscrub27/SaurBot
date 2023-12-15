@@ -1,5 +1,16 @@
 import random
 
+fortunes = ["You will come across great riches.",
+            "You will find true love.",
+            "You should stay indoors today.",
+            "You will not survive the apocalypse.",
+            "You will have an amazing day.",
+            "Sleep with one eye open.",
+            "Cherish your loved ones.",
+            "Be careful tomorrow.",
+            "A life-changing opportunity is ahead of you.",
+            "Today will be alright I guess.",
+            "The perfect cookie will be yours."]
 # have you ever taken a joke too far?
 class MoonCookie:
     name = "Plain Moon Cookie"
@@ -58,6 +69,8 @@ class MoonCookie:
             text += f"**ALLERGEN WARNING**: Contains {ingredient}.\n"
         if random.random() < 0.01:
             text += f"**ALLERGEN WARNING**: Contains lethal levels of cyanide.\n"
+        if random.random() < 0.01:
+            text += f"There's a fortune inside the cookie: \"{random.choice(fortunes)}\"\n"
         return text
 
 class ChocolateMoonCookie(MoonCookie):

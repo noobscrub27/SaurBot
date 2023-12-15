@@ -244,7 +244,7 @@ class HelpView(discord.ui.View):
         text += "- Get help with Saurbot Commands and a guide on how to use the Pokedex Search commands with the **Saurbot Guide**.\n"
         text += "If you have questions about FnF Showdown not answered by the provided links, reach out to noel5229 on Discord.\n"
         text += "If you have questions about Saurbot not answered by the Saurbot Guide, reach out to noobscrub on Discord."
-        await interaction.response.send_message(text, view=self, ephemeral=True)
+        await interaction.response.send_message(text, view=self, ephemeral=False)
 
 
 bot = Client()
