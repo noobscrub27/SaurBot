@@ -85,7 +85,7 @@ class PokedexCog(commands.GroupCog, group_name="pokedex"):
 
     @app_commands.command(name="pokemon")
     async def command_pokemon(self, interaction: discord.Interaction,
-                                    filters: str="all",
+                                    filters: str,
                                     base_forms: FilterRules=FilterRules.include,
                                     hypnomons: FilterRules=FilterRules.exclude,
                                     new_gen: FilterRules=FilterRules.exclude,
@@ -125,7 +125,7 @@ class PokedexCog(commands.GroupCog, group_name="pokedex"):
     
     @app_commands.command(name="move")
     async def command_move(self, interaction: discord.Interaction,
-                                    filters: str="all",
+                                    filters: str,
                                     base_forms: FilterRules=FilterRules.include,
                                     hypnomons: FilterRules=FilterRules.exclude,
                                     new_gen: FilterRules=FilterRules.exclude,
@@ -165,7 +165,7 @@ class PokedexCog(commands.GroupCog, group_name="pokedex"):
             
     @app_commands.command(name="ability")
     async def command_ability(self, interaction: discord.Interaction,
-                                    filters: str="all",
+                                    filters: str,
                                     base_forms: FilterRules=FilterRules.include,
                                     hypnomons: FilterRules=FilterRules.exclude,
                                     new_gen: FilterRules=FilterRules.exclude,

@@ -1638,10 +1638,10 @@ class Pokemon(DexData):
         self.text_values["embed stats"] = ""
         self.text_values["file stats"] = ""
         for stat in self.stats:
-            self.text_values["embed stats"] += f"{stat}: {self.stats[stat]}"
+            self.text_values["embed stats"] += f"**{stat}**: {self.stats[stat]}"
             self.text_values["file stats"] += f"{stat}: {self.stats[stat]}"
             if stat != "BST":
-                self.text_values["embed stats"] += "\n"
+                self.text_values["embed stats"] += ", "
                 self.text_values["file stats"] += ", "
         self.text_values["padded dex"] = padding(str(self.dex), 5)
         ladder_tier = "NONE" if self.ladder_tier == "UNTIERED" else self.ladder_tier
