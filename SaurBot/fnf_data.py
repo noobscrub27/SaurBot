@@ -294,7 +294,7 @@ class PPChangeEffect(MoveEffect):
         return text + self.get_text_suffix()
 
 def create_response_text(filter_name, pos, severity_type, text):
-    return f"[{severity_type.upper()}] {filter_name} filter at position {pos}: {text}"
+    return f"[{severity_type.upper()}] Ignoring {filter_name} filter at position {pos}: {text}"
 
 def padding(text, total_chars, padding_char=" ", left_padding=False):
     text_len = len(text)
@@ -967,46 +967,46 @@ class MoveDict(DexDict):
                                     response_text_list.append(value)
                                 else:
                                     # now we update the results
-                                    old_results = results
-                                    results = set()
-                                    for move in list(old_results):
+                                    new_results = set()
+                                    for move in list(results):
                                         if boost_target != "target":
                                             # check self_effect, self secondary effects, and zeffects for the boost
-                                            if len([effect for effect in move.self_effect + move.secondary_effects_user + move.zeffect if effect.name == "boosts" and stat in effect.details and comparison_function(value, effect.details[stat])]):
-                                                results.add(move)
+                                            if len([effect for effect in move.self_effect + move.secondary_effects_user + move.zeffect if effect.name == "Boosts" and stat in effect.details and comparison_function(value, effect.details[stat])]):
+                                                new_results.add(move)
                                             # check boosts for the boost
-                                            elif move.target == "self" and len([effect for effect in move.boosts if effect.name == "boosts" and stat in effect.details and comparison_function(value, effect.details[stat])]):
-                                                results.add(move)
+                                            elif move.target == "self" and len([effect for effect in move.boosts if effect.name == "Boosts" and stat in effect.details and comparison_function(value, effect.details[stat])]):
+                                                new_results.add(move)
                                         if boost_target != "user":
                                             # check boosts for the boost
-                                            if move.target == "self" and len([effect for effect in move.boosts if effect.name == "boosts" and stat in effect.details and comparison_function(value, effect.details[stat])]):
-                                                results.add(move)
+                                            if move.target == "self" and len([effect for effect in move.boosts if effect.name == "Boosts" and stat in effect.details and comparison_function(value, effect.details[stat])]):
+                                                new_results.add(move)
                                             # check boosts if move has secondary effects
-                                            elif len([effect for effect in move.secondary_effects_target if effect.name == "boosts" and stat in effect.details and comparison_function(value, effect.details[stat])]):
-                                                results.add(move)
+                                            elif len([effect for effect in move.secondary_effects_target if effect.name == "Boosts" and stat in effect.details and comparison_function(value, effect.details[stat])]):
+                                                new_results.add(move)
+                                    results = new_results
         # if the len is 0 we're looking for anything that boosts
         else:
             results = set()
             for move in self.values():
                 if boost_target != "target":
                     # check self_effect for boosts
-                    if len([effect for effect in move.self_effect if effect.name == "boosts"]) > 0:
+                    if len([effect for effect in move.self_effect if effect.name == "Boosts"]) > 0:
                         results.add(move)
                     # check boosts if move targets self
                     elif move.target == "self" and move.boosts != []:
                         results.add(move)
                     # check boosts if move has secondary effects that target self
-                    elif len([effect for effect in move.secondary_effects_user if effect.name == "boosts"]):
+                    elif len([effect for effect in move.secondary_effects_user if effect.name == "Boosts"]):
                         results.add(move)
                     # check boosts in the zeffect
-                    elif len([effect for effect in move.zeffect if effect.name == "boosts"]):
+                    elif len([effect for effect in move.zeffect if effect.name == "Boosts"]):
                         results.add(move)
                 if boost_target != "user":
                     # check boosts if move doesnt target self
                     if move.target != "self" and move.boosts != []:
                         results.add(move)
                     # check boosts if move has secondary effects
-                    elif len([effect for effect in move.secondary_effects_target if effect.name == "boosts"]) > 0:
+                    elif len([effect for effect in move.secondary_effects_target if effect.name == "Boosts"]) > 0:
                         results.add(move)
         return Argument(self.data_type_str, "stage", full_argument, list(results)), response_text_list
 
@@ -1066,15 +1066,15 @@ class MoveDict(DexDict):
                     if status_found:
                         break
                     if status_type == "nonvolatile":
-                        if status_source.name == "nonvolatile status" and status_source.details == status_to_find:
+                        if status_source.name == "Nonvolatile Status" and status_source.details == status_to_find:
                             results.append(move)
                             status_found = True
                             break
-                        elif status_source.name == "random status" and status_to_find in status_source.details:
+                        elif status_source.name == "Random Status" and status_to_find in status_source.details:
                             results.append(move)
                             status_found = True
                             break
-                    elif status_type == "volatile" and status_source.name == "volatile status" and status_to_find in status_source.details:
+                    elif status_type == "volatile" and status_source.name == "Volatile Status" and status_to_find in status_source.details:
                         results.append(move)
                         status_found = True
                         break
