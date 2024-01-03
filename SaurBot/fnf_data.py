@@ -7,14 +7,16 @@ import discord
 from discord.ext import commands
 import saurbot_functions
 import math
-from io import BytesIO
+from io import BytesIO, TextIOWrapper
 import random
+import csv
 
 SAURBOT_QUOTES = ["It's me!", "You're searching for me? Hello!", "Are you thinking of adding me to your team?", "I'll help with analysis and strategy, even if it's used against me.", "My stats are pretty good, huh?"]
 
 # these are defined on startup, but they are defined in other files
 NOEL_ID = None
 DEV_ID = None
+PIKA_ID = None
 FRONT_SPRITES_URL = ""
 FRONT_SHINY_SPRITES_URL = ""
 BACK_SPRITES_URL = ""
@@ -293,8 +295,10 @@ class PPChangeEffect(MoveEffect):
         text += f"the PP of the last used move by {self.details}. "
         return text + self.get_text_suffix()
 
-def create_response_text(filter_name, pos, severity_type, text):
-    return f"[{severity_type.upper()}] Ignoring {filter_name} filter at position {pos}: {text}"
+def create_response_text(filter_name, pos, severity_type, text, ignoring_filter=True):
+    if ignoring_filter:
+        filter_name = "Ignoring " + filter_name
+    return f"[{severity_type.upper()}] {filter_name} filter at position {pos}: {text}"
 
 def padding(text, total_chars, padding_char=" ", left_padding=False):
     text_len = len(text)
@@ -402,12 +406,12 @@ class DexDict(dict):
         results = []
         response_text_list = []
         if assumed:
-            response_text_list.append(create_response_text("name", pos, "notice", f"Unknown filter \"{stripped_argument}\". Defaulting to name filter."))
+            response_text_list.append(create_response_text("name", pos, "notice", f"Unknown filter \"{stripped_argument}\". Defaulting to name filter.", False))
         result, score = self.fuzzy_alias_search(stripped_argument)
         if result is not None:
             results.append(result)
             if score < 100:
-                response_text_list.append(create_response_text("name", pos, "notice", f"Could not find \"{stripped_argument}\". Autocorrected to {result.name}."))
+                response_text_list.append(create_response_text("name", pos, "notice", f"Could not find \"{stripped_argument}\". Autocorrected to {result.name}.", False))
         else:
             response_text_list.append(create_response_text("name", pos, "notice", f"Could not find \"{stripped_argument}\"."))
         return Argument(self.data_type_str, "name", full_argument, results), response_text_list
@@ -708,7 +712,7 @@ class MoveDict(DexDict):
             response_text_list.append(value)
             return Argument(self.data_type_str, "pp", full_argument, results), response_text_list
         if value % 8 == 0 and value % 5 != 0:
-            response_text_list.append(create_response_text("pp", pos, "notice", f"Filtering by base pp. If you want to filter by max pp, use the maxpp filter."))
+            response_text_list.append(create_response_text("pp", pos, "notice", f"Filtering by base pp. If you want to filter by max pp, use the maxpp filter.", False))
         results = [move for move in self.values() if comparison_function(value, move.pp)]
         return Argument(self.data_type_str, "pp", full_argument, results), response_text_list
 
@@ -952,9 +956,9 @@ class MoveDict(DexDict):
                             matched_boost = True
                             if stat == "hp":
                                 # you can't boost hp unfortunately
-                                response_text_list.append(create_response_text("stage", pos, "notice", f"Unfortunately, you can't boost HP. If it was possible, I would have done so already."))
+                                response_text_list.append(create_response_text("stage", pos, "notice", f"Unfortunately, you can't boost HP. If it was possible, I would have done so already.", False))
                             elif stat == "bst":
-                                response_text_list.append(create_response_text("stage", pos, "notice", f"You can't boost your base stat total. But that doesn't mean you don't have any room to grow!"))
+                                response_text_list.append(create_response_text("stage", pos, "notice", f"You can't boost your base stat total. But that doesn't mean you don't have any room to grow!", False))
                             else:
                                 # this removes the stat name. now we're at "+1"
                                 current_boost = current_boost.removeprefix(alias).strip()
@@ -1090,7 +1094,7 @@ class MoveDict(DexDict):
         if result is not None:
             results = [move for move in result.learnset.keys() if result.learns_move(move, gen)]
             if score < 100:
-                response_text_list.append(create_response_text("learned by", pos, "notice", f"Could not find \"{stripped_argument}\". Autocorrected to {result.name}."))
+                response_text_list.append(create_response_text("learned by", pos, "notice", f"Could not find \"{stripped_argument}\". Autocorrected to {result.name}.", False))
         else:
             response_text_list.append(create_response_text("learned by", pos, "notice", f"Could not find \"{stripped_argument}\"."))
         return Argument(self.data_type_str, "learned by", full_argument, results), response_text_list
@@ -1846,7 +1850,6 @@ class Fusion:
     def to_text_one_line(self):
         return ""
 
-
 class PkmnType:
     def __init__(self, name = ""):
         self.name = name
@@ -1960,6 +1963,56 @@ class SearchError(Exception):
     def __init__(self, description = "An unknown error occurred", send_error_log=False):
         self.description = description
         self.send_error_log = send_error_log
+
+def get_dl_doc_data():
+    # bc of the listcomps this can't be defined on startup
+    dl_filenames_and_moves = {"hazard_setting.csv": sorted(["Spikes", "Toxic Spikes", "Stealth Rock", "Sticky Web"]),
+                              "hazard_removal.csv": sorted(["Defog", "Rapid Spin", "Sweep Up", "Aggregate", "Demolition", "Shadow Shed", "Shadow Wheel"]),
+                              "healing.csv": sorted(["Heal Bell", "Wish", "Aromatherapy", "Healing Wish", "Lunar Dance", "Refresh", "Shadow Bath", "Shadow Flame", "Shadow Glaze", "Shadow Glow", "Shadow Moon", "Shadow Moss", "Shadow Sprites", "Shadow Sun"]),
+                              "momentum.csv": sorted(["Dry Pass", "Memento", "Parting Shot", "U-Turn", "Volt Switch", "Propulsion Shot", "Shadow Pivot", "Flip Turn"]),
+                              "item_removal.csv": sorted(["Knock Off", "Switcheroo", "Trick", "Naughty-or-Nice"]),
+                              "status.csv": sorted(["Glare", "Nuzzle", "Spore", "Thunder Wave", "Will-O-Wisp", "Yawn", "Chilling Rime", "Shadow Bolt", "Shadow Chill", "Shadow Cinder", "Shadow Fire", "Shadow Frost", "Shadow Fumes", "Shadow Stare", "Shadow Trance", "Shadow Spell"]),
+                              "priority.csv": sorted([move.name for move in moves.values() if (move.category in ["Physical", "Special"]) and (move.priority > 0) and (move.name != "Bide")]),
+                              "disruption.csv": sorted(["Circle Throw", "Clear Smog", "Dragon Tail", "Encore", "Haze", "Roar", "Taunt", "Whirlwind", "Spectral Thief", "Cat Burglary", "Sparkling Water", "Yorikiri", "Shadow Dissolve", "Shadow Fog", "Shadow Hurl", "Shadow Reset", "Shadow Shuffle", "Aroma Bomb", "Gastro Slam", "Gastro Acid"])}
+    results = []
+    with BytesIO() as f:
+        sb = TextIOWrapper(f, "utf-8", newline="")
+        writer = csv.writer(sb, dialect="excel", delimiter=",")
+        row = ["Pokemon", "HP", "Atk", "Def", "SpA", "SpD", "Spe", "BST", "Type1", "Type2", "Ability1", "Ability2", "Hidden Ability"]
+        writer.writerow(row)
+        for mon in pokemon.values():
+            if mon.check_filter_rules():
+                row = [mon.name, mon.stats['HP'], mon.stats['ATK'], mon.stats['DEF'], mon.stats['SPA'], mon.stats['SPD'], mon.stats['SPE'], mon.stats['BST'], mon.types[0].name]
+                try:
+                    row.append(mon.types[1].name)
+                except IndexError:
+                    row.append("")
+                row.append(mon.abilities["0"].name)
+                if mon.abilities["1"] is not None:
+                    row.append(mon.abilities["1"].name)
+                else:
+                    row.append("")
+                if mon.abilities["H"] is not None:
+                    row.append(mon.abilities["H"].name)
+                else:
+                    row.append("")
+                writer.writerow(row)
+        sb.flush()
+        f.seek(0)
+        results.append(discord.File(fp=f, filename='pokemon.csv'))
+    for filename in dl_filenames_and_moves:
+        with BytesIO() as f:
+            sb = TextIOWrapper(f, "utf-8", newline="")
+            writer = csv.writer(sb, dialect="excel", delimiter=",")
+            text = ""
+            for move in dl_filenames_and_moves[filename]:
+                for mon in pokemon.values():
+                    if mon.check_filter_rules() and mon.learns_move(move, 7):
+                        writer.writerow([mon.name, move])
+            sb.flush()
+            f.seek(0)
+            results.append(discord.File(fp=f, filename=filename))
+    return results
 
 def determine_comparison(command):
     if command.startswith("=="):
@@ -2535,8 +2588,14 @@ def check_is_noob(interaction: discord.Interaction):
 def check_is_nole(interaction: discord.Interaction):
     return interaction.user.id == NOEL_ID
 
+def check_is_pika(interaction: discord.Interaction):
+    return interaction.user.id == PIKA_ID
+
 def check_is_noob_or_nole(interaction: discord.Interaction):
     return check_is_noob(interaction) or check_is_nole(interaction)
+
+def check_is_noob_or_nole_or_pika(interaction: discord.Interaction):
+    return check_is_noob(interaction) or check_is_nole(interaction) or check_is_pika(interaction)
 
 async def ephemeral_error_message(interaction: discord.Interaction, error):
     saurbot_functions.timelog(str(error))

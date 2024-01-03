@@ -228,6 +228,20 @@ class PokedexCog(commands.GroupCog, group_name="pokedex"):
         else:
             await interaction.response.send_message(fusion, ephemeral=True)
 
+    @app_commands.command(name="dl_sheets", description="Request csv copies of the Saurbot database for the DL sheet. Devs only.")
+    @app_commands.check(fnf_data.check_is_noob_or_nole_or_pika)
+    async def command_dl_sheets(self, interaction: discord.Interaction):
+        if fnf_data.currently_updating:
+            await interaction.response.send_message(f"The database is currently updating. Please try again later.", ephemeral=True)
+            return
+        else:
+            csvs = fnf_data.get_dl_doc_data()
+            await interaction.response.send_message(f"Here you go!", ephemeral=True, files=csvs)
+    
+    @command_dl_sheets.error
+    async def command_dl_sheets_error(self, interaction: discord.Interaction, error):
+        await fnf_data.ephemeral_error_message(interaction, error)
+    
 async def setup(bot: commands.Bot):
     await bot.add_cog(PokedexCog(bot))
 

@@ -11,7 +11,8 @@ fortunes = ["You will come across great riches.",
             "Be careful tomorrow.",
             "A life-changing opportunity is ahead of you.",
             "Today will be alright I guess.",
-            "The perfect cookie will be yours."]
+            "The perfect cookie will be yours.",
+            "You will lose a game to a crit."]
 
 class MoonCookie:
     name = "Plain Moon Cookie"

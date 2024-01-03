@@ -26,7 +26,8 @@ with open("token.txt", "r") as f:
     lines = f.readlines()
     fnf_data.DEV_ID = int(lines[0].strip())
     fnf_data.NOEL_ID = int(lines[1].strip())
-    TOKEN = lines[2].strip()
+    fnf_data.PIKA_ID = int(lines[2].strip())
+    TOKEN = lines[3].strip()
 
 DEFAULT_MAX_LINES = 10
 DEFAULT_MAX_CHARS = 1000
@@ -224,21 +225,24 @@ class Client(commands.Bot):
 
 class HelpView(discord.ui.View):
     async def send(self, interaction):
-        self.timeout = 300
-        fnf_showdown_client_button = discord.ui.Button(label="FnF Showdown Client", style=discord.ButtonStyle.url, url="https://fnf-showdown-client.herokuapp.com/")
+        self.timeout = 43200
+        fnf_showdown_client_button = discord.ui.Button(label="FnF Showdown Client", style=discord.ButtonStyle.url, url="https://fnf-showdown-client.herokuapp.com/", row=0)
         self.add_item(fnf_showdown_client_button)
-        fnf_showdown_doc_button = discord.ui.Button(label="FnF Showdown Doc", style=discord.ButtonStyle.url, url="https://docs.google.com/spreadsheets/d/1olW_CgttMCgvR3LYIMndMfNDH18lqQAOf3ylPoosf_k/edit?usp=sharing")
+        fnf_showdown_calc_button = discord.ui.Button(label="Damage Calculator", style=discord.ButtonStyle.url, url="https://noobscrub27.github.io/fnf-damage-calc", row=0)
+        self.add_item(fnf_showdown_calc_button)
+        fnf_showdown_doc_button = discord.ui.Button(label="FnF Showdown Doc", style=discord.ButtonStyle.url, url="https://docs.google.com/spreadsheets/d/1olW_CgttMCgvR3LYIMndMfNDH18lqQAOf3ylPoosf_k/edit?usp=sharing", row=0)
         self.add_item(fnf_showdown_doc_button)
-        point_and_spriting_guide_button = discord.ui.Button(label="Points & Spriting Guide", style=discord.ButtonStyle.url, url="https://docs.google.com/spreadsheets/d/1mXYqbtdAfKr4fBcHyj4BOJ6xypQaxkHqmAiHQgzEo2Q/edit?usp=sharing")
+        point_and_spriting_guide_button = discord.ui.Button(label="Points & Spriting Guide", style=discord.ButtonStyle.url, url="https://docs.google.com/spreadsheets/d/1mXYqbtdAfKr4fBcHyj4BOJ6xypQaxkHqmAiHQgzEo2Q/edit?usp=sharing", row=1)
         self.add_item(point_and_spriting_guide_button)
-        hypnomons_doc_button = discord.ui.Button(label="Hypnomons Doc", style=discord.ButtonStyle.url, url="https://docs.google.com/spreadsheets/d/1SeKw1jYmnKmNUGKDQ7b8ZiR6c21bOOWhw1YJfax_YXg/edit?usp=sharing")
+        hypnomons_doc_button = discord.ui.Button(label="Hypnomons Doc", style=discord.ButtonStyle.url, url="https://docs.google.com/spreadsheets/d/1SeKw1jYmnKmNUGKDQ7b8ZiR6c21bOOWhw1YJfax_YXg/edit?usp=sharing", row=1)
         self.add_item(hypnomons_doc_button)
-        saurbot_guide_button = discord.ui.Button(label="Saurbot Guide", style=discord.ButtonStyle.url, url="https://docs.google.com/document/d/13SDdfcPebgQNadCTgHCheVKdhF4eCME-YjUgX4q96Ko/edit?usp=sharing")
+        saurbot_guide_button = discord.ui.Button(label="Saurbot Guide", style=discord.ButtonStyle.url, url="https://docs.google.com/document/d/13SDdfcPebgQNadCTgHCheVKdhF4eCME-YjUgX4q96Ko/edit?usp=sharing", row=1)
         self.add_item(saurbot_guide_button)
 
         text = "***Help and resources:***\n"
         text += "- **The FnF Showdown Client** is where you can play FnF Showdown.\n"
         text += "- Find all of the data on the FnF Showdown changes with the **FnF Showdown Doc**. Type into the blue bar in the PokeViewer tab to view a specific pokemon in detail.\n"
+        text += "- Plan your next move using the **Damage Calculator**. *The damage calculator is under development and is not fully functional yet*.\n"
         text += "- Keep track of points and spriting with the **Points & Spriting Guide**, while also viewing the FnF Showdown custom pokedex.\n"
         text += "- View all information on Hypnomons in depth with the **Hypnomons Doc**, including sprites and custom dex entries!\n"
         text += "- Get help with Saurbot Commands and a guide on how to use the Pokedex Search commands with the **Saurbot Guide**.\n"
