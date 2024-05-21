@@ -2,11 +2,209 @@ import fnf_data
 import discord
 from discord.ext import commands
 from discord import app_commands
-import enum
+import datetime
+import saurbot_functions
+import random
 
-class ProfileType(enum.Enum):
-    pokemon = 0
-    mario_kart = 1
+MAX_LINKED_SHOWDOWN_ACCOUNTS = 10
+
+async def create_profile_view(interaction: discord.Interaction, bot, user_profile, copy=False):
+    profile_view = ProfileView(bot, user_profile, copy)
+    await profile_view.send(interaction)
+
+PROFILE_PAGES = ["Overview", "Pokemon", "Battle Data", "Gym Challenge", "Mario Kart Wii"]
+
+class ProfileView(discord.ui.View):
+    sep: int = 10
+    def __init__(self, bot, user_profile, copy):
+        super().__init__()
+        self.bot = bot
+        self.bointa = True if random.random() > 0.99 else False
+        self.user_profile = user_profile
+        self.embed = None
+        self.current_page = PROFILE_PAGES[0]
+        self.timeout = 900
+        self.message_text = ""
+        self.message = None
+        self.command_user = None
+        self.copy = copy
+        self.primary_select_menu = None
+
+    async def create_overview_embed(self):
+        profile_user = await self.bot.fetch_user(self.user_profile.id)
+        embed = discord.Embed(color=(profile_user.accent_color if profile_user.accent_color is not None else discord.Color.default()),title=self.current_page)
+        embed.set_thumbnail(url=profile_user.display_avatar.url)
+        embed.add_field(name=("Bointa" if self.bointa else "Points"), value=str(self.user_profile.bointa), inline=False)
+        embed.add_field(name="Treasures", value=self.user_profile.get_treasure_text(), inline=False)
+        self.embed = embed
+
+    async def create_pokemon_embed(self):
+        profile_user = await self.bot.fetch_user(self.user_profile.id)
+        embed = discord.Embed(color=(profile_user.accent_color if profile_user.accent_color is not None else discord.Color.default()),title=self.current_page)
+        if self.user_profile.trainer_sprite_url is not None:
+            embed.set_thumbnail(url=self.user_profile.trainer_sprite_url)
+        else:
+            embed.set_thumbnail(url=profile_user.display_avatar.url)
+        embed.add_field(name="Favorite Pokemon", value=str(self.user_profile.favorite_mon), inline=False)
+        embed.add_field(name="Favorite Buff/Rework", value=str(self.user_profile.favorite_buff), inline=False)
+        embed.add_field(name="Favorite Custom Pokemon", value=str(self.user_profile.favorite_custom_mon), inline=False)
+        embed.add_field(name="Favorite Story Character", value=str(self.user_profile.favorite_story_char), inline=False)
+        if self.user_profile.shadowmon is not None:
+            embed.add_field(name="Shadowmon", value=f'{self.user_profile.shadowmon["nickname"]} ({"Purified" if self.user_profile.shadowmon["purified"] else "Shadow"} {self.user_profile.shadowmon["species"]})\n*/pokedex pokemon name {self.user_profile.shadowmon["command_name"]}*')
+        else:
+            embed.add_field(name="Shadowmon", value="None")
+        if len(self.user_profile.showdown_accounts):
+            showdown_accounts_text = ""
+            for account in self.user_profile.showdown_accounts:
+                showdown_accounts_text += account + ", "
+            showdown_accounts_text = showdown_accounts_text.removesuffix(", ")
+            embed.add_field(name="Showdown Accounts", value=showdown_accounts_text)
+        else:
+            embed.add_field(name="Showdown Accounts", value="None linked")
+        self.embed = embed
+
+    async def create_battle_data_embed(self):
+        profile_user = await self.bot.fetch_user(self.user_profile.id)
+        embed = discord.Embed(color=(profile_user.accent_color if profile_user.accent_color is not None else discord.Color.default()),title=self.current_page)
+        if self.user_profile.trainer_sprite_url is not None:
+            embed.set_thumbnail(url=self.user_profile.trainer_sprite_url)
+        else:
+            embed.set_thumbnail(url=profile_user.display_avatar.url)
+        if self.user_profile.public_trainer_data == False:
+            embed.add_field(name="Trainer data is not public", value="If this is your profile and you would like to share trainer data, link your Showdown account with */profile showdown link*, then use */profile share_trainer_data*.", inline=False)
+            self.embed = embed
+        else:
+            embed.add_field(name="Not ready yet!", value="This section of the profile is under construction.", inline=False)
+        self.embed = embed
+
+    async def create_gym_challenge_embed(self):
+        profile_user = await self.bot.fetch_user(self.user_profile.id)
+        embed = discord.Embed(color=(profile_user.accent_color if profile_user.accent_color is not None else discord.Color.default()),title=self.current_page)
+        if self.user_profile.trainer_sprite_url is not None:
+            embed.set_thumbnail(url=self.user_profile.trainer_sprite_url)
+        else:
+            embed.set_thumbnail(url=profile_user.display_avatar.url)
+        embed.add_field(name="Badges obtained", value=str(self.user_profile.badges_obtained), inline=False)
+        embed.add_field(name="More coming soon!", value="This section of the profile is under construction.", inline=False)
+        self.embed = embed
+
+    async def create_mario_kart_wii_embed(self):
+        profile_user = await self.bot.fetch_user(self.user_profile.id)
+        embed = discord.Embed(color=(profile_user.accent_color if profile_user.accent_color is not None else discord.Color.default()),title=self.current_page)
+        embed.set_thumbnail(url=profile_user.display_avatar.url)
+        if self.user_profile.favorite_mkw_char is not None:
+            embed.add_field(name="Favorite Character", value=str(self.user_profile.favorite_mkw_char), inline=False)
+        if self.user_profile.favorite_mkw_vehicle is not None:
+            embed.add_field(name="Favorite Vehicle", value=str(self.user_profile.favorite_mkw_vehicle), inline=False)
+        if self.user_profile.favorite_course is not None:
+            embed.add_field(name="Favorite Course", value=str(self.user_profile.favorite_course), inline=False)
+        # friend codes being stored seperately from the rest of the profile is a holdover from when saurbot was first made and the profile system was less organized
+        # it was done this way so that mkw friend codes are shared across multiple servers
+        # however, I've since moved away from this approach and make every profile different from server to server when I can
+        mkw_profile = True if self.user_profile.id in fnf_data.user_mkw_fc and len(fnf_data.user_mkw_fc[self.user_profile.id]) else False
+        if mkw_profile:
+            text = ""
+            for i, code in enumerate(fnf_data.user_mkw_fc[self.user_profile.id]):
+                text += f"{i+1}: {code}\n"
+            embed.add_field(name="Friend Codes", value=text, inline=False)
+        else:
+            embed.add_field(name="Friend Codes", value="None", inline=False)
+        self.embed = embed
+
+    async def send(self, interaction):
+        self.command_user = interaction.user
+        self.create_primary_select_menu()
+        self.current_page = PROFILE_PAGES[0]
+        await self.create_overview_embed()
+        self.message = await interaction.followup.send(view=self, ephemeral=self.copy)
+        await self.update_message()
+        
+    async def interaction_check(self, interaction: discord.Interaction):
+        if interaction.data["custom_id"] in ["ProfileView:happy_ivy_button"]:
+            if self.copy:
+                await interaction.response.send_message("Ivysaur says hi!", ephemeral=True)
+                return False
+        elif interaction.user != self.command_user:
+            await interaction.response.send_message("You can't interact with someone else's command. Press the Ivysaur button to create a personal copy of this command.", ephemeral=True)
+            return False
+        return True
+
+    async def update_message(self):
+        profile_user = await self.bot.fetch_user(self.user_profile.id)
+        await self.message.edit(content=f"**{profile_user.display_name}'s Profile**", embed=self.embed, attachments=[], view=self)
+
+    def create_primary_select_menu(self):
+        if self.primary_select_menu is not None:
+            return
+        self.primary_select_menu = ProfilePrimarySelectMenu(PROFILE_PAGES, self.current_page)
+        self.add_item(self.primary_select_menu)
+
+    def destroy_primary_select_menu(self):
+        if self.primary_select_menu is not None:
+            self.remove_item(self.primary_select_menu)
+            self.primary_select_menu = None
+
+    # use related menu code from story cog for the secondary menu when its implemented
+
+    @discord.ui.button(label="", style=discord.ButtonStyle.green, emoji="<:happyivy:666673253414207498>", custom_id="ProfileView:happy_ivy_button")
+    async def happy_ivy_button(self, interaction:discord.Interaction, button: discord.ui.Button):
+        await interaction.response.defer()
+        await create_profile_view(interaction, self.bot, self.user_profile, True)
+
+    async def respond_to_primary_select_menu(self, interaction: discord.Interaction, values):
+        await interaction.response.defer()
+        new_page = values[0]
+        self.current_page = new_page
+        if self.current_page == "Overview":
+            await self.create_overview_embed()
+        elif self.current_page == "Pokemon":
+            await self.create_pokemon_embed()
+        elif self.current_page == "Battle Data":
+            await self.create_battle_data_embed()
+        elif self.current_page == "Gym Challenge":
+            await self.create_gym_challenge_embed()
+        elif self.current_page == "Mario Kart Wii":
+            await self.create_mario_kart_wii_embed()
+        self.destroy_primary_select_menu()
+        self.create_primary_select_menu()
+        await self.update_message()
+   
+
+class ProfilePrimarySelectMenu(discord.ui.Select):
+    def __init__(self, pages, current_page_name):
+        super().__init__(placeholder=current_page_name, custom_id="ProfileView:ProfilePrimarySelectMenu")
+        self.timeout = None
+        options = []
+        for page in pages:
+            if page == current_page_name:
+                continue
+            options.append(discord.SelectOption(label=page, value=page))
+        self.options = options
+
+    async def callback(self, interaction: discord.Interaction):
+        await self.view.respond_to_primary_select_menu(interaction, self.values)
+
+'''
+class ProfileSecondarySelectMenu(discord.ui.Select):
+    def __init__(self, related, page_number, show_last_page, show_next_page):
+        super().__init__(placeholder="Browse related entries", custom_id="ProfileView:ProfilePSecondarySelectMenu")
+        options = [discord.SelectOption(label=item, value=item) for item in related]
+        if show_last_page:
+            options = [discord.SelectOption(label=f"(To page {page_number-1})", value="<lastpage>")] + options
+        if show_next_page:
+            options += [discord.SelectOption(label=f"(To page {page_number+1})", value="<nextpage>")]
+        self.options = options
+
+    async def callback(self, interaction: discord.Interaction):
+        await self.view.respond_to_related_select_menu(interaction, self.values)
+'''
+
+async def unlink_autocomplete(interaction: discord.Interaction, current):
+    guild_id = interaction.guild_id
+    user_id = interaction.user.id
+    return [app_commands.Choice(name=item, value=item)
+            for item in fnf_data.guild_preferences[guild_id].user_profiles[user_id].showdown_accounts
+            if saurbot_functions.only_a_to_z(current) in saurbot_functions.only_a_to_z(item)]
 
 @app_commands.guild_only()
 class ProfileCog(commands.GroupCog, group_name="profile"):
@@ -16,6 +214,7 @@ class ProfileCog(commands.GroupCog, group_name="profile"):
     points_group = app_commands.Group(name="points", description="Manage the number of points each user has. Requires permission.")
     shadowmon_group = app_commands.Group(name="shadowmon", description="Manage each user's shadowmon. Requires permission.")
     mkw_group = app_commands.Group(name="mkw", description="Manage your Mario Kart Wii friend codes.")
+    showdown_group = app_commands.Group(name="showdown", description="Link or unlink a Pokemon Showdown account to your Saurbot profile.")
     @app_commands.command(name="set")
     async def command_set(self, interaction: discord.Interaction,
                           favorite_pokemon: str="",
@@ -86,6 +285,7 @@ class ProfileCog(commands.GroupCog, group_name="profile"):
                              favorite_buff: str="",
                              favorite_custom_pokemon: str="",
                              favorite_story_character: str="",
+                             trainer_sprite_url: str="",
                              badge_amount: int=-1,
                              mkw_character: str="",
                              mkw_vehicle: str="",
@@ -104,6 +304,8 @@ class ProfileCog(commands.GroupCog, group_name="profile"):
             Optional. The member's favorite Pokemon introduced in FnF. Type "none" to reset.
         favorite_story_character: str
             Optional. The member's favorite character from the FnF story. Type "none" to reset.
+        trainer_sprite_url: str
+            Optional. The url for the member's custom trainer sprite. Type "none" to reset.
         badge_amount: int
             Optional. The amount of gym badges earned by the member.
         mkw_character: str
@@ -121,6 +323,8 @@ class ProfileCog(commands.GroupCog, group_name="profile"):
             return
         elif badge_amount != 1:
             fnf_data.guild_preferences[guild_id].user_profiles[user_id].badges_obtained = badge_amount
+        if trainer_sprite_url != "":
+            fnf_data.guild_preferences[guild_id].user_profiles[user_id].trainer_sprite_url = None if trainer_sprite_url == "none" else trainer_sprite_url
         if favorite_pokemon != "":
             if len(favorite_pokemon) > 1024:
                 favorite_pokemon = favorite_pokemon[:1024]
@@ -158,36 +362,46 @@ class ProfileCog(commands.GroupCog, group_name="profile"):
 
     @app_commands.command(name="view")
     async def command_view(self, interaction: discord.Interaction,
-                           member: discord.Member,
-                           profile_type: ProfileType):
+                           member: discord.Member):
         """View a member's profile.
 
         Parameters
         -----------
         member: discord.Member
             The member whose profile you want to view.
-        profile_type: ProfileType
-            The profile data you want to see. Options: pokemon, mario_kart
         """
+        await interaction.response.defer(thinking=True)
         self.bot.create_guild_preferences(interaction.guild)
         user_id = member.id
-        if profile_type.value == 0:
-            profile_type = "pkmn"
-        elif profile_type.value == 1:
-            profile_type = "mkw"
         if user_id is None or self.bot.create_guild_user_profile(interaction.guild, user_id) == False:
-            await interaction.response.send_message(f"That user is not a member of this server.", ephemeral=True)
+            await interaction.followup.send(content=f"That user is not a member of this server.", ephemeral=True)
             return
-        if profile_type not in ["pkmn", "mkw"]:
-            await interaction.response.send_message(f"profile_type must be pokemon or mario_kart.", ephemeral=True)
+        await create_profile_view(interaction, self.bot, fnf_data.guild_preferences[interaction.guild_id].user_profiles[user_id])
+
+    @app_commands.command(name="share_trainer_data", description="If you have a Showdown account linked, your battle data will be made visible to others.")
+    async def command_share_trainer_data(self, interaction: discord.Interaction):
+        self.bot.create_guild_user_profile(interaction.guild, interaction.user.id)
+        guild_id = interaction.guild_id
+        user_id = interaction.user.id
+        if fnf_data.guild_preferences[guild_id].user_profiles[user_id].public_trainer_data:
+            await interaction.response.send_message(f"Your battle data is already visible to others.", ephemeral=True)
             return
-        embed = await fnf_data.guild_preferences[interaction.guild_id].user_profiles[user_id].get_embed(profile_type)
-        if embed == None:
-            fnf_data.timelog("An unknown error occurred. (caused by /profile view)")
-            await interaction.response.send_message(f"An unknown error occurred.", ephemeral=True)
-            return
-        await interaction.response.send_message(embed=embed)
+        fnf_data.guild_preferences[guild_id].user_profiles[user_id].public_trainer_data = True
+        self.bot.write_preferences()
+        await interaction.response.send_message(f"Your battle data is now visible to others. Use */profile hide_trainer_data* if you would like to undo this. Note that this setting does nothing if you don't have a Showdown account linked. To link a Showdown account, use */profile showdown link*.", ephemeral=True)
     
+    @app_commands.command(name="hide_trainer_data", description="Your battle data will be hidden from others.")
+    async def command_hide_trainer_data(self, interaction: discord.Interaction):
+        self.bot.create_guild_user_profile(interaction.guild, interaction.user.id)
+        guild_id = interaction.guild_id
+        user_id = interaction.user.id
+        if fnf_data.guild_preferences[guild_id].user_profiles[user_id].public_trainer_data == False:
+            await interaction.response.send_message(f"Your battle data is already hidden from others.", ephemeral=True)
+            return
+        fnf_data.guild_preferences[guild_id].user_profiles[user_id].public_trainer_data = False
+        self.bot.write_preferences()
+        await interaction.response.send_message(f"Your battle data is now hidden from others.", ephemeral=True)
+
     @points_group.command(name="add")
     @app_commands.check(fnf_data.check_saurbot_permissions)
     async def command_point_add(self, interaction: discord.Interaction,
@@ -357,6 +571,66 @@ class ProfileCog(commands.GroupCog, group_name="profile"):
     @command_unassign_shadowmon.error
     async def command_assign_unshadowmon_error(self, interaction: discord.Interaction, error):
         await fnf_data.ephemeral_error_message(interaction, error)
+
+    @showdown_group.command(name="link")
+    async def command_link(self, interaction: discord.Interaction,
+                          account: str):
+        """Link a Pokemon Showdown account to your Saurbot profile.
+
+        Parameters
+        -----------
+        account: str
+            The Showdown account to link. Ensure that you own this account and it is password-protected!
+        """
+        await interaction.response.defer(thinking=True,ephemeral=True)
+        self.bot.create_guild_user_profile(interaction.guild, interaction.user.id)
+        now = datetime.datetime.now().timestamp()
+        guild_id = interaction.guild_id
+        user_id = interaction.user.id
+        not_a_number = False
+        try:
+            int(account)
+        except ValueError:
+            not_a_number = True
+        if not_a_number == False or len(account) > 18:
+            await interaction.followup.send(content=f"This is not a valid Showdown account name.", ephemeral=True)
+            return
+        if saurbot_functions.only_a_to_z(account) in [item.lower() for item in fnf_data.guild_preferences[interaction.guild_id].user_profiles[user_id].showdown_accounts]:
+            await interaction.followup.send(content=f"You've already linked this account.", ephemeral=True)
+            return
+        if fnf_data.guild_preferences[interaction.guild_id].get_user_from_showdown(account) is not None:
+            await interaction.followup.send(content=f"Someone else has already linked this account.", ephemeral=True)
+            return
+        pending_len = len(list(fnf_data.guild_preferences[interaction.guild_id].user_profiles[user_id].pending_showdown_account_links))
+        account_len = len(list(fnf_data.guild_preferences[interaction.guild_id].user_profiles[user_id].showdown_accounts))
+        if pending_len + account_len + 1 > MAX_LINKED_SHOWDOWN_ACCOUNTS:
+            await interaction.followup.send(content=f"You cannot have more than {MAX_LINKED_SHOWDOWN_ACCOUNTS} Showdown accounts linked. Please unlink an account before linking another.",ephemeral=True)
+            return
+        fnf_data.guild_preferences[interaction.guild_id].user_profiles[user_id].pending_showdown_account_links[saurbot_functions.only_a_to_z(account)] = now
+        self.bot.write_preferences()
+        await interaction.followup.send(content=f"Step one complete. Please log into Pokemon Showdown as {account} and DM Saurbot the word \"link\" within five minutes to continue.", ephemeral=True)
+
+    @showdown_group.command(name="unlink")
+    @app_commands.autocomplete(account=unlink_autocomplete)
+    async def command_unlink(self, interaction: discord.Interaction,
+                          account: str):
+        """Unlink a linked Pokemon Showdown account from your Saurbot profile.
+
+        Parameters
+        -----------
+        account: str
+            The Showdown account to unlink. It will be removed from your Saurbot profile.
+        """
+        self.bot.create_guild_user_profile(interaction.guild, interaction.user.id)
+        now = datetime.datetime.now().timestamp()
+        guild_id = interaction.guild_id
+        user_id = interaction.user.id
+        if account not in fnf_data.guild_preferences[interaction.guild_id].user_profiles[user_id].showdown_accounts:
+            await interaction.response.send_message(f"You don't have a linked Showdown account named {account}.", ephemeral=True)
+            return
+        fnf_data.guild_preferences[interaction.guild_id].user_profiles[user_id].showdown_accounts.remove(account)
+        self.bot.write_preferences()
+        await interaction.response.send_message(f"Successfully unlinked {account} from your profile.", ephemeral=True)
 
     @mkw_group.command(name="add_fc")
     async def command_add_mkw_fc(self, interaction: discord.Interaction,

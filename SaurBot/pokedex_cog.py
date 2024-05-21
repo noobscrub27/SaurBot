@@ -64,6 +64,9 @@ class PokedexCog(commands.GroupCog, group_name="pokedex"):
         if fnf_data.currently_updating:
             await interaction.response.send_message(f"The database is already being updated. Please try again later.", ephemeral=True)
             return
+        elif self.bot.check_gspread_api_cooldown() == False:
+            await interaction.response.send_message(f"Update commands are currently on cooldown. Please try again later.", ephemeral=True)
+            return
         else:
             if revealing and fnf_data.check_is_nole(interaction) == False:
                 await interaction.response.send_message(f"I'm sorry noob. I'm afraid I can't do that.", ephemeral=True)
@@ -95,7 +98,7 @@ class PokedexCog(commands.GroupCog, group_name="pokedex"):
         Parameters
         -----------
         filters: str
-            Optional. The filters to apply.
+            The filters to apply.
         base_forms: FilterRules
             Optional. Include, exclude, or require base forms. Default: Include
         hypnomons: FilterRules
@@ -135,7 +138,7 @@ class PokedexCog(commands.GroupCog, group_name="pokedex"):
         Parameters
         -----------
         filters: str
-            Optional. The filters to apply.
+            The filters to apply.
         base_forms: FilterRules
             Optional. Include, exclude, or require moves exclusive to base forms. Default: Include
         hypnomons: FilterRules
@@ -175,7 +178,7 @@ class PokedexCog(commands.GroupCog, group_name="pokedex"):
         Parameters
         -----------
         filters: str
-            Optional. The filters to apply.
+            The filters to apply.
         base_forms: FilterRules
             Optional. Include, exclude, or require abilities exclusive to base forms. Default: Include
         hypnomons: FilterRules
@@ -228,24 +231,70 @@ class PokedexCog(commands.GroupCog, group_name="pokedex"):
         else:
             await interaction.response.send_message(fusion, ephemeral=True)
 
-    @app_commands.command(name="dl_sheets", description="Request csv copies of the Saurbot database for the DL sheet. Devs only.")
+    @app_commands.command(name="update_draft_prep", description="Use the Saurbot database to update the data for the prep doc. Devs only.")
     @app_commands.check(fnf_data.check_is_noob_or_nole_or_pika)
-    async def command_dl_sheets(self, interaction: discord.Interaction):
+    async def command_update_draft_prep(self, interaction: discord.Interaction):
+        
         if fnf_data.currently_updating:
             await interaction.response.send_message(f"The database is currently updating. Please try again later.", ephemeral=True)
             return
+        elif self.bot.check_gspread_api_cooldown() == False:
+            await interaction.response.send_message(f"Update commands are currently on cooldown. Please try again later.", ephemeral=True)
+            return
         else:
-            csvs = fnf_data.get_dl_doc_data()
-            await interaction.response.send_message(f"Here you go!", ephemeral=True, files=csvs)
+            await interaction.response.defer(ephemeral=True, thinking=True)
+            cells_updated = fnf_data.get_dl_doc_data()
+            await interaction.followup.send(content=f"Updated {cells_updated} cells(s).", ephemeral=True)
     
-    @command_dl_sheets.error
-    async def command_dl_sheets_error(self, interaction: discord.Interaction, error):
+    @command_update_draft_prep.error
+    async def command_update_draft_prep_error(self, interaction: discord.Interaction, error):
         await fnf_data.ephemeral_error_message(interaction, error)
+
+    @app_commands.command(name="safari")
+    async def command_safari(self, interaction: discord.Interaction,
+                                   size: int,
+                                   filters: str="all",
+                                   base_forms: FilterRules=FilterRules.include,
+                                   hypnomons: FilterRules=FilterRules.exclude,
+                                   new_gen: FilterRules=FilterRules.exclude,
+                                   ignored: FilterRules=FilterRules.exclude):
+        """Creates a safari box by randomly selecting pokemon from a pokemon search.
+
+        Parameters
+        -----------
+        size: int
+            The number of pokemon to put in the box.
+        filters: str
+            Optional. The filters to apply.
+        base_forms: FilterRules
+            Optional. Include, exclude, or require base forms. Default: Include
+        hypnomons: FilterRules
+            Optional. Include, exclude, or require hypnomons. Default: Exclude
+        new_gen: FilterRules
+            Optional. Include, exclude, or require pokemon from games after USUM. Default: Exclude
+        ignored: FilterRules
+            Optional. Include, exclude, or require non-canon pokemon (eg. Pokestar pokemon). Default: Exclude
+        """
+        if fnf_data.commands_locked and (fnf_data.check_is_noob_or_nole(interaction) == False):
+            await interaction.response.send_message(f"Pokedex commands are currently disabled. Please try again later.", ephemeral=True)
+            return
+        elif fnf_data.currently_updating:
+            await interaction.response.send_message(f"The database is currently updating. Please try again later.", ephemeral=True)
+            return
+        elif size < 1:
+            await interaction.response.send_message("The box size needs to be at least 1.", ephemeral=True)
+            return
+        filter_rules = {"base forms": base_forms.value,
+                        "hypnomons": hypnomons.value,
+                        "new gens": new_gen.value,
+                        "ignored": ignored.value}
+        command = fnf_showdown.Command("pokemon " + filters.strip(), filter_rules, size)
+        command.run_command()
+        if command.success:
+            await fnf_data.create_pagination_view(interaction, self.bot, command)
+        else:
+            await interaction.response.send_message(command.output, ephemeral=True)
+            await self.bot.dm_noob(command.error_log)
     
 async def setup(bot: commands.Bot):
     await bot.add_cog(PokedexCog(bot))
-
-
-
-
-

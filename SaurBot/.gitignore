@@ -3,6 +3,7 @@ backups
 point logs
 wip files
 Habitat
+Habitat2
 token.txt
 credentials-sheets.json
 guild_preferences.pickle
@@ -15,3 +16,8 @@ showdown_scraper.py
 pokemon_hashes.txt
 temporary.png
 cookie_types.py
+story_profiles.json
+calc_species_reader.py
+comparison_results_chronological.txt
+comparison_results_discrepencies.txt
+comparison_results_pokemon.txt

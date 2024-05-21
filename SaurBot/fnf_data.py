@@ -1,19 +1,27 @@
 ﻿from thefuzz import process
 from PIL import Image, ImageFont, ImageDraw
+import requests
 import re
-import os
 import textwrap
 import discord
-from discord.ext import commands
 import saurbot_functions
 import math
-from io import BytesIO, TextIOWrapper
+from io import BytesIO
 import random
-import csv
+import gspread
 
 SAURBOT_QUOTES = ["It's me!", "You're searching for me? Hello!", "Are you thinking of adding me to your team?", "I'll help with analysis and strategy, even if it's used against me.", "My stats are pretty good, huh?"]
 
-# these are defined on startup, but they are defined in other files
+CHANGE_ID_DESCRIPTIONS = ["This <DATATYPE> is unchanged from vanilla.",
+                          "This <DATATYPE> was edited by FnF Showdown.",
+                          "This is a custom <DATATYPE> created by FnF Showdown."]
+def get_full_description(description, change_id, data_type, italic=True):
+    addendum = CHANGE_ID_DESCRIPTIONS[change_id].replace("<DATATYPE>", data_type)
+    if italic:
+        addendum = "*" + addendum + "*"
+    return description.strip() + " " + addendum
+
+# these are created on startup, but they are defined in other files
 NOEL_ID = None
 DEV_ID = None
 PIKA_ID = None
@@ -23,6 +31,7 @@ BACK_SPRITES_URL = ""
 BACK_SHINY_SPRITES_URL = ""
 DEX_SPRITES_URL = ""
 DEX_SHINY_SPRITES_URL = ""
+SHOWDOWN_INSTRUCTIONS_FILE = ""
 
 MOBILE_IMAGE_WARNING = "Full results not shown. To see the rest, use a different view mode."
 
@@ -45,6 +54,9 @@ guild_preferences = {}
 # user_tutorial_state isn't used anymore
 user_tutorial_state = {}
 user_mkw_fc = {}
+
+analyzed_replays = []
+formats = {}
 
 sprite_list = []
 ignore_forms = ["Pokestar Giant-PropO1", "Pokestar Giant-PropO2", "Pokestar UFO-PropU1", "Hypno-Happyf"]
@@ -318,7 +330,6 @@ class Type:
 
 class DexDict(dict):
     data_type_str = ""
-
     def __init__(self, base_dict=None):
         super().__init__()
         # key will be a common name of a pokemon/move/ability
@@ -416,6 +427,24 @@ class DexDict(dict):
             response_text_list.append(create_response_text("name", pos, "notice", f"Could not find \"{stripped_argument}\"."))
         return Argument(self.data_type_str, "name", full_argument, results), response_text_list
 
+    def filter_vanilla(self, pos, full_argument):
+        results = []
+        response_text_list = []
+        results = [item for item in self.values() if item.change_id == 0]
+        return Argument(self.data_type_str, "pokedex", full_argument, results), response_text_list
+
+    def filter_edited(self, pos, full_argument):
+        results = []
+        response_text_list = []
+        results = [item for item in self.values() if item.change_id == 1]
+        return Argument(self.data_type_str, "edited", full_argument, results), response_text_list
+
+    def filter_custom(self, pos, full_argument):
+        results = []
+        response_text_list = []
+        results = [item for item in self.values() if item.change_id == 2]
+        return Argument(self.data_type_str, "custom", full_argument, results), response_text_list
+
     def filter_all(self):
         return Argument(self.data_type_str, "all", "all", list(self.values())), []
 
@@ -506,7 +535,23 @@ class PokemonDict(DexDict):
     def all_finish_setup(self):
         super().all_finish_setup()
         for item in self.values():
+            base_species = self.alias_search(item.base_species_name)
+            if base_species is not item:
+                item.base_species = base_species
+        for item in self.values():
             item.check_learnset()
+
+    def filter_vanilla(self, pos, full_argument):
+        results = []
+        response_text_list = []
+        results = [mon for mon in self.values() if mon.buff == ""]
+        return Argument(self.data_type_str, "pokedex", full_argument, results), response_text_list
+
+    def filter_edited(self, pos, full_argument):
+        raise SearchError(create_response_text("pokedex", pos, "error", f"{self.data_type_str} does not support this filter. To get a list of custom and edited pokemon, use the buff filter."))
+
+    def filter_custom(self, pos, full_argument):
+        raise SearchError(create_response_text("pokedex", pos, "error", f"{self.data_type_str} does not support this filter. To get a list of custom and edited pokemon, use the buff filter."))
    
     def filter_pokedex(self, pos, full_argument, stripped_argument):
         results = []
@@ -975,17 +1020,17 @@ class MoveDict(DexDict):
                                     for move in list(results):
                                         if boost_target != "target":
                                             # check self_effect, self secondary effects, and zeffects for the boost
-                                            if len([effect for effect in move.self_effect + move.secondary_effects_user + move.zeffect if effect.name == "Boosts" and stat in effect.details and comparison_function(value, effect.details[stat])]):
+                                            if move.target == "self" and len([effect for effect in move.self_effect + move.secondary_effects_user + move.zeffect if effect.name == "Boosts" and stat in effect.details and comparison_function(value, effect.details[stat])]):
                                                 new_results.add(move)
                                             # check boosts for the boost
                                             elif move.target == "self" and len([effect for effect in move.boosts if effect.name == "Boosts" and stat in effect.details and comparison_function(value, effect.details[stat])]):
                                                 new_results.add(move)
                                         if boost_target != "user":
                                             # check boosts for the boost
-                                            if move.target == "self" and len([effect for effect in move.boosts if effect.name == "Boosts" and stat in effect.details and comparison_function(value, effect.details[stat])]):
+                                            if move.target != "self" and len([effect for effect in move.boosts if effect.name == "Boosts" and stat in effect.details and comparison_function(value, effect.details[stat])]):
                                                 new_results.add(move)
                                             # check boosts if move has secondary effects
-                                            elif len([effect for effect in move.secondary_effects_target if effect.name == "Boosts" and stat in effect.details and comparison_function(value, effect.details[stat])]):
+                                            elif move.target != "self" and len([effect for effect in move.secondary_effects_target if effect.name == "Boosts" and stat in effect.details and comparison_function(value, effect.details[stat])]):
                                                 new_results.add(move)
                                     results = new_results
         # if the len is 0 we're looking for anything that boosts
@@ -1180,6 +1225,11 @@ class Ability(DexData):
     def __init__(self, internal_name):
         super().__init__(internal_name)
         self.description = "Description not available"
+        # change_id:
+        # 0 = vanilla
+        # 1 = edited
+        # 2 = custom
+        self.change_id = 0
 
     def calculate_filter_rules(self):
         self.filter_rule_ignored = False
@@ -1208,7 +1258,7 @@ class Ability(DexData):
 
     def to_embed(self):
         embed = discord.Embed(title=self.name)
-        embed.add_field(name="Description", value=self.description)
+        embed.add_field(name="Description", value=get_full_description(self.description, self.change_id, "ability"))
         return embed, []
 
     def to_text(self):
@@ -1241,6 +1291,11 @@ class Move(DexData):
         self.secondary_effects_user = []
         self.secondary_effects_target = []
         self.unresolved_secondaries = False
+        # change_id:
+        # 0 = vanilla
+        # 1 = edited
+        # 2 = custom
+        self.change_id = 0
 
     def calculate_zpower(self):
         if self.category == "Status":
@@ -1359,7 +1414,7 @@ class Move(DexData):
             for effect in other_effects:
                 text += str(effect) + "\n"
             embed.add_field(name="Move effects", value=text.strip(), inline=False)
-        embed.add_field(name="Description", value=self.description)
+        embed.add_field(name="Description", value=get_full_description(self.description, self.change_id, "move"))
         return embed, attachments
 
     def to_text(self):
@@ -1393,7 +1448,8 @@ class Pokemon(DexData):
     def __init__(self, internal_name):
         super().__init__(internal_name)
         self.sprites = {}
-        self.base_species = ""
+        self.base_species_name = ""
+        self.base_species = None
         self.required_item = ""
         self.required_ability = ""
         self.required_move = ""
@@ -1418,22 +1474,20 @@ class Pokemon(DexData):
         self.learnset = {}
         self.matchups = {}
         self.learnset_checked = False
-        self.changes_from = ""
         self.buff = ""
         self.sample_sets = []
         self.changes = ""
         self.cosmetic_forms = []
+        
 
     def check_learnset(self):
         if self.learnset_checked:
             return
         prevo = None
-        base_form = None
         if self.prevo is not None:
             self.prevo.check_learnset()
-        if self.changes_from != "":
-            base_form = pokemon.alias_search(self.changes_from)
-            base_form.check_learnset()
+        if self.base_species is not None:
+            self.base_species.check_learnset()
         if self.prevo is not None:
             for move in self.prevo.learnset:
                 for method in self.prevo.learnset[move]:
@@ -1443,9 +1497,9 @@ class Pokemon(DexData):
                     if move not in self.learnset:
                         self.learnset[move] = []
                     self.learnset[move].append(evo_method)
-        if base_form is not None:
-            for move in base_form.learnset:
-                for method in base_form.learnset[move]:
+        if self.base_species is not None:
+            for move in self.base_species.learnset:
+                for method in self.base_species.learnset[move]:
                     evo_method = method[0] + "form"
                     if move in self.learnset and (method[0] in self.learnset[move] or evo_method in self.learnset[move]):
                         continue
@@ -1489,6 +1543,11 @@ class Pokemon(DexData):
                             "Shiny Front": FRONT_SHINY_SPRITES_URL + "toxtricity-gmax.png",
                             "Shiny Back": BACK_SHINY_SPRITES_URL + "toxtricity-gmax.png"}
             return 4
+        is_shadow = False
+        for name in self.aliases:
+            if "shadow" in name.lower() and self.internal_name not in ["marshadow", "calyrexshadow"]:
+                is_shadow = True
+                break
         # split into 4 dicts to ensure a consistent order is shown to the user
         male_sprites_dict = {}
         female_sprites_dict = {}
@@ -1499,7 +1558,8 @@ class Pokemon(DexData):
         for img_file in sprite_list:
             simplified_img_file = saurbot_functions.only_a_to_z(img_file.removesuffix(".png"))
             found_sprite = False
-            for alias in [name for name in self.aliases if name not in simplified_cosmetic_forms]:
+            alias_list = list(self.aliases) if is_shadow == False else [self.internal_name]
+            for alias in [name for name in alias_list if name not in simplified_cosmetic_forms]:
                 if (simplified_img_file == alias+"f" or simplified_img_file+"totem" == alias+"f") and self.name not in ["Unown", "Pyroar", "Nidoran", "Unfezant"]:
                     has_gender_difference = True
                     female_sprites_dict["Female Front"] = FRONT_SPRITES_URL + img_file
@@ -1562,13 +1622,19 @@ class Pokemon(DexData):
 
     def after_scraping(self):
         super().after_scraping()
+        if self.form == "Mega-X":
+            self.add_alias("Mega "+self.base_species_name+ " X")
+        if self.form == "Mega-Y":
+            self.add_alias("Mega "+self.base_species_name+ " Y")
+        elif self.form != "":
+            self.add_alias(self.form+" "+self.base_species_name)
         self.get_weight_attributes()
         for key in self.gender_ratio:
             self.gender_ratio[key] *= 100
         if self.form in ["Galar", "Alola", "FnF", "Delta"]:
-            self.base_species = self.name
+            self.base_species_name = self.name
         if self.required_item.endswith("Armor"):
-            self.base_species = self.name.removesuffix("-Armored")
+            self.base_species_name = self.name.removesuffix("-Armored")
             self.form = "Armored"
         if self.gender_ratio == {"M": 0, "F": 0, "N": 0}:
             self.gender_ratio = {"M": 50, "F": 50, "N": 0}
@@ -1582,7 +1648,7 @@ class Pokemon(DexData):
         self.evos = new_evos
 
     def calculate_filter_rules(self):
-        if self.base_species == self.name:
+        if self.base_species_name == self.name:
             self.filter_rule_base_forms = True
         if -1000 < self.num <= -500:
             self.filter_rule_ignored = False
@@ -1835,7 +1901,7 @@ class Fusion:
         text += f"Possible types: {self.possible_types}\n"
         text += f"Possbile abilities: {self.possible_abilities}\n"
         text += f"Stats: {self.stats_text}\n"
-        text += f"Learnset (New gen only marked with asterisk):\n"
+        text += f"Gen 7 Learnset:\n"
         return text
 
     def to_text(self):
@@ -1966,53 +2032,54 @@ class SearchError(Exception):
 
 def get_dl_doc_data():
     # bc of the listcomps this can't be defined on startup
-    dl_filenames_and_moves = {"hazard_setting.csv": sorted(["Spikes", "Toxic Spikes", "Stealth Rock", "Sticky Web"]),
-                              "hazard_removal.csv": sorted(["Defog", "Rapid Spin", "Sweep Up", "Aggregate", "Demolition", "Shadow Shed", "Shadow Wheel"]),
-                              "healing.csv": sorted(["Heal Bell", "Wish", "Aromatherapy", "Healing Wish", "Lunar Dance", "Refresh", "Shadow Bath", "Shadow Flame", "Shadow Glaze", "Shadow Glow", "Shadow Moon", "Shadow Moss", "Shadow Sprites", "Shadow Sun"]),
-                              "momentum.csv": sorted(["Dry Pass", "Memento", "Parting Shot", "U-Turn", "Volt Switch", "Propulsion Shot", "Shadow Pivot", "Flip Turn"]),
-                              "item_removal.csv": sorted(["Knock Off", "Switcheroo", "Trick", "Naughty-or-Nice"]),
-                              "status.csv": sorted(["Glare", "Nuzzle", "Spore", "Thunder Wave", "Will-O-Wisp", "Yawn", "Chilling Rime", "Shadow Bolt", "Shadow Chill", "Shadow Cinder", "Shadow Fire", "Shadow Frost", "Shadow Fumes", "Shadow Stare", "Shadow Trance", "Shadow Spell"]),
-                              "priority.csv": sorted([move.name for move in moves.values() if (move.category in ["Physical", "Special"]) and (move.priority > 0) and (move.name != "Bide")]),
-                              "disruption.csv": sorted(["Circle Throw", "Clear Smog", "Dragon Tail", "Encore", "Haze", "Roar", "Taunt", "Whirlwind", "Spectral Thief", "Cat Burglary", "Sparkling Water", "Yorikiri", "Shadow Dissolve", "Shadow Fog", "Shadow Hurl", "Shadow Reset", "Shadow Shuffle", "Aroma Bomb", "Gastro Slam", "Gastro Acid"])}
-    results = []
-    with BytesIO() as f:
-        sb = TextIOWrapper(f, "utf-8", newline="")
-        writer = csv.writer(sb, dialect="excel", delimiter=",")
-        row = ["Pokemon", "HP", "Atk", "Def", "SpA", "SpD", "Spe", "BST", "Type1", "Type2", "Ability1", "Ability2", "Hidden Ability"]
-        writer.writerow(row)
-        for mon in pokemon.values():
-            if mon.check_filter_rules():
-                row = [mon.name, mon.stats['HP'], mon.stats['ATK'], mon.stats['DEF'], mon.stats['SPA'], mon.stats['SPD'], mon.stats['SPE'], mon.stats['BST'], mon.types[0].name]
-                try:
-                    row.append(mon.types[1].name)
-                except IndexError:
-                    row.append("")
-                row.append(mon.abilities["0"].name)
-                if mon.abilities["1"] is not None:
-                    row.append(mon.abilities["1"].name)
-                else:
-                    row.append("")
-                if mon.abilities["H"] is not None:
-                    row.append(mon.abilities["H"].name)
-                else:
-                    row.append("")
-                writer.writerow(row)
-        sb.flush()
-        f.seek(0)
-        results.append(discord.File(fp=f, filename='pokemon.csv'))
+    dl_filenames_and_moves = {"Hazard_Setting": sorted(["Spikes", "Toxic Spikes", "Stealth Rock", "Sticky Web"]),
+                              "Hazard_Removal": sorted(["Defog", "Rapid Spin", "Sweep Up", "Aggregate", "Demolition", "Shadow Shed", "Shadow Wheel"]),
+                              "Healing": sorted(["Heal Bell", "Wish", "Aromatherapy", "Healing Wish", "Lunar Dance", "Refresh", "Shadow Bath", "Shadow Flame", "Shadow Glaze", "Shadow Glow", "Shadow Moon", "Shadow Moss", "Shadow Sprites", "Shadow Sun", "Recover", "Roost", "Synthesis", "Moonlight", "Morning Sun", "Slack Off", "Shore Up", "Strength Sap", "Parasitic Drain", "Soft-boiled", "Milk Drink", "Kappo", "Aggregate", "Regroup"]),
+                              "Momentum": sorted(["Dry Pass", "Memento", "Parting Shot", "U-Turn", "Volt Switch", "Propulsion Shot", "Shadow Pivot", "Flip Turn"]),
+                              "Item_Removal": sorted(["Knock Off", "Switcheroo", "Trick", "Naughty-or-Nice"]),
+                              "Status": sorted(["Glare", "Nuzzle", "Spore", "Thunder Wave", "Will-O-Wisp", "Yawn", "Chilling Rime", "Shadow Bolt", "Shadow Chill", "Shadow Cinder", "Shadow Fire", "Shadow Frost", "Shadow Fumes", "Shadow Stare", "Shadow Trance", "Shadow Spell"]),
+                              "Priority": sorted([move.name for move in moves.values() if (move.category in ["Physical", "Special"]) and (move.priority > 0) and (move.name != "Bide")]),
+                              "Disruption": sorted(["Circle Throw", "Clear Smog", "Dragon Tail", "Encore", "Haze", "Roar", "Taunt", "Whirlwind", "Spectral Thief", "Cat Burglary", "Sparkling Water", "Yorikiri", "Shadow Dissolve", "Shadow Fog", "Shadow Hurl", "Shadow Reset", "Shadow Shuffle", "Aroma Bomb", "Gastro Slam", "Gastro Acid"]),
+                              "VGC_Support": sorted(["Ally Switch", "Breaking Swipe", "Coaching", "Helping Hand", "Quick Guard", "Rage Powder", "Snarl", "Wide Guard"]),
+                              "Speed_Control": sorted(["Tailwind", "Trick Room", "Bulldoze", "Electroweb", "Glaciate", "Icy Wind"])}
+    client = gspread.service_account(filename="credentials-sheets.json")
+    sheet = client.open("FnF Draft Prep Doc Data")
+    updated_cells = 0
+    rows = [["Pokemon", "HP", "Atk", "Def", "SpA", "SpD", "Spe", "BST", "Type1", "Type2", "Ability1", "Ability2", "Hidden Ability"]]
+    for mon in pokemon.values():
+        if mon.check_filter_rules():
+            row = [mon.name, mon.stats['HP'], mon.stats['ATK'], mon.stats['DEF'], mon.stats['SPA'], mon.stats['SPD'], mon.stats['SPE'], mon.stats['BST'], mon.types[0].name]
+            if mon.name == "Necrozma-Dusk-Mane":
+                row[0] = "Necrozma-Dusk"
+            elif mon.name == "Necrozma-Dawn-Wings":
+                row[0] = "Necrozma-Dawn"
+            try:
+                row.append(mon.types[1].name)
+            except IndexError:
+                row.append("")
+            row.append(mon.abilities["0"].name)
+            if mon.abilities["1"] is not None:
+                row.append(mon.abilities["1"].name)
+            else:
+                row.append("")
+            if mon.abilities["H"] is not None:
+                row.append(mon.abilities["H"].name)
+            else:
+                row.append("")
+            rows.append(row)
+    sheet.worksheet("Pokemon").clear()
+    results = sheet.worksheet("Pokemon").update(f"A1:M{len(rows)}", rows)
+    updated_cells += results["updatedCells"]
     for filename in dl_filenames_and_moves:
-        with BytesIO() as f:
-            sb = TextIOWrapper(f, "utf-8", newline="")
-            writer = csv.writer(sb, dialect="excel", delimiter=",")
-            text = ""
-            for move in dl_filenames_and_moves[filename]:
-                for mon in pokemon.values():
-                    if mon.check_filter_rules() and mon.learns_move(move, 7):
-                        writer.writerow([mon.name, move])
-            sb.flush()
-            f.seek(0)
-            results.append(discord.File(fp=f, filename=filename))
-    return results
+        rows = []
+        sheet.worksheet(filename).clear()
+        for move in dl_filenames_and_moves[filename]:
+            for mon in pokemon.values():
+                if mon.check_filter_rules() and mon.learns_move(move, 7):
+                    rows.append([mon.name, move])
+        results = sheet.worksheet(filename).update(f"A1:B{len(rows)}", rows)
+        updated_cells += results["updatedCells"]
+    return updated_cells
 
 def determine_comparison(command):
     if command.startswith("=="):
@@ -2125,6 +2192,8 @@ async def create_pagination_view(interaction: discord.Interaction, bot, command,
     active_command_views.append(pagination_view)
 
 class PaginationView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=900)
     current_page: int = 1
     sep: int = 10
     async def send(self, interaction: discord.Interaction, bot, command, copy):
@@ -2168,7 +2237,6 @@ class PaginationView(discord.ui.View):
             self.selected_index = None
             self.selected_results = {}
         self.command_user = interaction.user
-        self.timeout = 43200
         self.number_of_pages = max(math.ceil(len(self.data) / self.sep), 1)
         await interaction.response.defer()
         self.create_select_result_menu()
@@ -2247,16 +2315,17 @@ class PaginationView(discord.ui.View):
         self.stop()
 
     async def interaction_check(self, interaction: discord.Interaction):
-        if interaction.data["custom_id"] in ["happyIvy_button"]:
-            if interaction.user == self.command_user:
+        if interaction.data["custom_id"] in ["PaginationView:happy_ivy_button"]:
+            if self.copy:
                 await interaction.response.send_message("Ivysaur says hi!", ephemeral=True)
                 return False
             elif commands_locked:
                 await interaction.response.send_message("This command can't be copied right now.", ephemeral=True)
                 return False
+        elif interaction.data["custom_id"] in ["PaginationView:view_sprite_button"]:
             return True
-        if interaction.user != self.command_user:
-            await interaction.response.send_message("You can't interact with someone else's command. Press the Ivysaur button to create your own copy of this command.", ephemeral=True)
+        elif interaction.user != self.command_user:
+            await interaction.response.send_message("You can't interact with someone else's command. Press the Ivysaur button to create a personal copy of this command.", ephemeral=True)
             return False
         return True
 
@@ -2277,16 +2346,12 @@ class PaginationView(discord.ui.View):
                 await self.message.edit(content=self.message_text, embed=self.create_embed(), attachments=[], view=self)
             elif self.view_mode == "file":
                 await self.message.edit(content=self.message_text, embed=None, attachments=[self.results_file], view=self)
-            elif self.view_mode == "image":
-                await self.message.edit(content=self.message_text, embed=None, attachments=[self.results_image], view=self)
         else:
             self.set_selected_results()
             if self.view_mode == "embed":
                 await self.message.edit(content=self.message_text, embed=self.selected_results["embed"], attachments=[], view=self)
             elif self.view_mode == "file":
                 await self.message.edit(content=self.message_text, embed=None, attachments=[self.selected_results["file"]], view=self)
-            elif self.view_mode == "image":
-                await self.message.edit(content=self.message_text, embed=None, attachments=[self.selected_results["image"]], view=self)
 
     def update_buttons(self):
         self.destroy_select_result_menu()
@@ -2298,35 +2363,25 @@ class PaginationView(discord.ui.View):
             self.next_page_button.disabled = True
             self.first_page_button.disabled = True
             self.previous_page_button.disabled = True
-            if self.view_mode == "image":
+            if self.view_mode == "file":
                 self.destroy_cosmetic_form_select_menu()
-                self.image_view_button.disabled = True
-                self.file_view_button.disabled = False
-                self.embed_view_button.disabled = False
-            elif self.view_mode == "file":
-                self.destroy_cosmetic_form_select_menu()
-                self.image_view_button.disabled = False
                 self.file_view_button.disabled = True
                 self.embed_view_button.disabled = False
             elif self.view_mode == "embed":
                 self.create_cosmetic_form_select_menu()
-                self.image_view_button.disabled = False
                 self.file_view_button.disabled = False
                 self.embed_view_button.disabled = True
+            if self.command_type == "pokemon":
+                self.view_sprite_button.disabled = False
+            else:
+                self.view_sprite_button.disabled = True
         else:
             self.create_sort_select_menu()
             self.create_select_result_menu()
             self.destroy_cosmetic_form_select_menu()
             self.back_to_results_button.disabled = True
+            self.view_sprite_button.disabled = True
             self.reverse_sort_button.disabled = False
-            if self.view_mode == "image":
-                self.image_view_button.disabled = True
-                self.last_page_button.disabled = True
-                self.next_page_button.disabled = True
-                self.first_page_button.disabled = True
-                self.previous_page_button.disabled = True
-            else:
-                self.image_view_button.disabled = False
             if self.view_mode == "file":
                 self.file_view_button.disabled = True
                 self.last_page_button.disabled = True
@@ -2401,60 +2456,74 @@ class PaginationView(discord.ui.View):
                                  "file": self.bot.turn_into_file(self.data[self.selected_index].to_text()),
                                  "image": ready_image(make_image(self.data[self.selected_index].to_image_text()))}
 
-    @discord.ui.button(label=" |< ", style=discord.ButtonStyle.blurple, custom_id="first_page_button")
+    @discord.ui.button(label=" |< ", style=discord.ButtonStyle.blurple, custom_id="PaginationView:first_page_button")
     async def first_page_button(self, interaction:discord.Interaction, button: discord.ui.Button):
         await interaction.response.defer()
         self.current_page = 1
         await self.update_message()
 
-    @discord.ui.button(label="  <  ", style=discord.ButtonStyle.blurple, custom_id="previous_page_button")
+    @discord.ui.button(label="  <  ", style=discord.ButtonStyle.blurple, custom_id="PaginationView:previous_page_button")
     async def previous_page_button(self, interaction:discord.Interaction, button: discord.ui.Button):
         await interaction.response.defer()
         self.current_page -= 1
         await self.update_message()
 
-    @discord.ui.button(label="", style=discord.ButtonStyle.green, emoji="<:happyivy:666673253414207498>", custom_id="happyIvy_button")
+    @discord.ui.button(label="", style=discord.ButtonStyle.green, emoji="<:happyivy:666673253414207498>", custom_id="PaginationView:happy_ivy_button")
     async def happy_ivy_button(self, interaction:discord.Interaction, button: discord.ui.Button):
         await create_pagination_view(interaction, self.bot, self.command, True)
         await self.update_message()
         
-    @discord.ui.button(label="  >  ", style=discord.ButtonStyle.blurple, custom_id="next_page_button")
+    @discord.ui.button(label="  >  ", style=discord.ButtonStyle.blurple, custom_id="PaginationView:next_page_button")
     async def next_page_button(self, interaction:discord.Interaction, button: discord.ui.Button):
         await interaction.response.defer()
         self.current_page += 1
         await self.update_message()
 
-    @discord.ui.button(label=" >| ", style=discord.ButtonStyle.blurple, custom_id="last_page_button")
+    @discord.ui.button(label=" >| ", style=discord.ButtonStyle.blurple, custom_id="PaginationView:last_page_button")
     async def last_page_button(self, interaction:discord.Interaction, button: discord.ui.Button):
         await interaction.response.defer()
         self.current_page = self.number_of_pages
         await self.update_message()
 
-    @discord.ui.button(label="Reverse sort", style=discord.ButtonStyle.blurple, custom_id="reverse_sort_button")
+    @discord.ui.button(label="Reverse sort", style=discord.ButtonStyle.blurple, custom_id="PaginationView:reverse_sort_button")
     async def reverse_sort_button(self, interaction:discord.Interaction, button: discord.ui.Button):
         await interaction.response.defer()
         self.reverse_sort = not self.reverse_sort
         await self.sort()
         
-    @discord.ui.button(label="Embed", style=discord.ButtonStyle.grey, custom_id="view_embed_button")
+    @discord.ui.button(label="Embed", style=discord.ButtonStyle.grey, custom_id="PaginationView:view_embed_button")
     async def embed_view_button(self, interaction:discord.Interaction, button: discord.ui.Button):
         await interaction.response.defer()
         self.view_mode = "embed"
         await self.update_message()
 
-    @discord.ui.button(label="File", style=discord.ButtonStyle.grey, custom_id="view_file_button")
+    @discord.ui.button(label="File", style=discord.ButtonStyle.grey, custom_id="PaginationView:view_file_button")
     async def file_view_button(self, interaction:discord.Interaction, button: discord.ui.Button):
         await interaction.response.defer()
         self.view_mode = "file"
         await self.update_message()
 
-    @discord.ui.button(label="Image", style=discord.ButtonStyle.grey, custom_id="view_image_button")
-    async def image_view_button(self, interaction:discord.Interaction, button: discord.ui.Button):
+    @discord.ui.button(label="View Sprite", style=discord.ButtonStyle.blurple, custom_id="PaginationView:view_sprite_button")
+    async def view_sprite_button(self, interaction:discord.Interaction, button: discord.ui.Button):
         await interaction.response.defer()
-        self.view_mode = "image"
-        await self.update_message()
+        if self.command_type == "pokemon":
+            selected_mon = self.data[self.selected_index]
+            if len(selected_mon.sprites):
+                sprites_list = [key for key in selected_mon.sprites]
+                if self.selected_cosmetic_form == "<default>":
+                    url = list(selected_mon.sprites.values())[0]
+                else:
+                    url = selected_mon.sprites[self.selected_cosmetic_form]
+            else:
+                await interaction.followup.send(content="No sprites are available for viewing.", ephemeral=True)
+                return
+            response = requests.get(url)
+            img = Image.open(BytesIO(response.content))
+            big_img = img.resize((img.width*2,img.height*2))
+            await interaction.followup.send(content="To download, right click (PC) or long tap (mobile) and select Save Image. (Second image is a copy with increased size for viewing purposes)",
+                                            files=[ready_image(img), ready_image(big_img)], ephemeral=True)
 
-    @discord.ui.button(label="Back", style=discord.ButtonStyle.blurple, custom_id="back_to_results_button")
+    @discord.ui.button(label="Back", style=discord.ButtonStyle.blurple, custom_id="PaginationView:back_to_results_button")
     async def back_to_results_button(self, interaction:discord.Interaction, button: discord.ui.Button):
         await interaction.response.defer()
         self.selected_index = None
@@ -2493,7 +2562,7 @@ class PaginationView(discord.ui.View):
 
 class ResultsSelectMenu(discord.ui.Select):
     def __init__(self, options):
-        super().__init__(placeholder="Select an option to view details.", min_values=0)
+        super().__init__(placeholder="Select an option to view details.", min_values=0, custom_id="PaginationView:ResultsSelectMenu")
         self.options = options
 
     async def callback(self, interaction: discord.Interaction):
@@ -2501,7 +2570,7 @@ class ResultsSelectMenu(discord.ui.Select):
 
 class SortSelectMenu(discord.ui.Select):
     def __init__(self, command_type):
-        super().__init__(placeholder="Select a sort method.")
+        super().__init__(placeholder="Select a sort method.", custom_id="PaginationView:SortSelectMenu")
         if command_type == "pokemon":
             options = [discord.SelectOption(label="Dex", value="pokedex"),
                        discord.SelectOption(label="Name", value="name"),
@@ -2563,7 +2632,7 @@ class SortSelectMenu(discord.ui.Select):
 
 class CosmeticFormSelectMenu(discord.ui.Select):
     def __init__(self, forms, start, end, next_page_name):
-        super().__init__(placeholder="Select a cosmetic form.")
+        super().__init__(placeholder="Select a cosmetic form.", custom_id="PaginationView:CosmeticFormSelectMenu")
         options = [discord.SelectOption(label=form, value=form) for form in forms]
         if len(options) == 0:
             options = [discord.SelectOption(label="Default", value="<default>")]

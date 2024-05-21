@@ -38,8 +38,11 @@ class CommandPart:
             return self.contents
 
 class Command:
-    def __init__(self, command, filter_rules):
+    def __init__(self, command, filter_rules, randomly_select=-1):
         self.filter_rules = filter_rules
+        # if randomly_select != -1, instead of showing all results, it will show randomly_select results chosen at random
+        # this is used for safari boxes
+        self.randomly_select = randomly_select
         self.output = ""
         self.success = False
         self.error_log = None
@@ -179,10 +182,22 @@ class Command:
             if argument.startswith(prefix):
                 argument = argument.removeprefix(prefix)
                 return data_list.filter_draft(pos, full_argument, argument.strip())
-        for prefix in ["buffed", "buff", "changed", "change"]:
+        for prefix in ["buffed", "buff"]:
             if argument.startswith(prefix):
                 argument = argument.removeprefix(prefix)
                 return data_list.filter_buff(pos, full_argument, argument.strip())
+        for prefix in ["vanilla", "unchanged", "unedited"]:
+            if argument.startswith(prefix):
+                argument = argument.removeprefix(prefix)
+                return data_list.filter_vanilla(pos, full_argument)
+        for prefix in ["changed", "edited"]:
+            if argument.startswith(prefix):
+                argument = argument.removeprefix(prefix)
+                return data_list.filter_edited(pos, full_argument)
+        for prefix in ["custom", "new"]:
+            if argument.startswith(prefix):
+                argument = argument.removeprefix(prefix)
+                return data_list.filter_custom(pos, full_argument)
         for prefix in ["nfe"]:
             if argument.startswith(prefix):
                 argument = argument.removeprefix(prefix)
@@ -223,6 +238,10 @@ class Command:
             if argument.startswith(prefix):
                 argument = argument.removeprefix(prefix)
                 return data_list.filter_maxpp(pos, full_argument, argument.strip())
+        for prefix in ["category", "cat"]:
+            if argument.startswith(prefix):
+                argument = argument.removeprefix(prefix)
+                return data_list.filter_category(pos, full_argument, argument.strip())
         for prefix in ["accuracy", "acc"]:
             if argument.startswith(prefix):
                 argument = argument.removeprefix(prefix)
@@ -463,8 +482,20 @@ class Command:
                                                                                                 self.filter_rules["hypnomons"],
                                                                                                 self.filter_rules["new gens"],
                                                                                                 self.filter_rules["ignored"])]
+            if self.randomly_select > 0:
+                self.results = sorted(random.sample(self.results, min(len(self.results), self.randomly_select)), key=lambda x: x.name)
             if len(self.results) == 0:
                 self.all_response_texts.append("No results found.")
+            elif len(self.results) < self.randomly_select:
+                self.all_response_texts.append(f"Not enough Pokemon exist that meet the criteria. Box size: {len(self.results)}.")
+            if self.randomly_select > 0:
+                if len(self.results) == 0:
+                    self.all_response_texts.append("Box contents: (empty)")
+                else:
+                    text = "Box contents: "
+                    for result in self.results:
+                        text += result.name + ", "
+                    self.all_response_texts.append(text.removesuffix(", "))
             self.success = True
             self.log_function_end()
             return
@@ -533,8 +564,8 @@ def fuse(pokemon1, pokemon2):
         return "Could not find one or both Pokemon."
     if pokemon1 is pokemon2:
         return "You can't fuse two identical Pokemon."
-    name1 = hyphenate_word(pokemon1.base_species)
-    name2 = hyphenate_word(pokemon2.base_species)
+    name1 = hyphenate_word(pokemon1.base_species_name)
+    name2 = hyphenate_word(pokemon2.base_species_name)
     if len(name1) == 1:
         start = name1[0]
     else:
@@ -613,7 +644,7 @@ def fuse(pokemon1, pokemon2):
     image_text = gen7_image_text.strip().removesuffix(",") + "\nNew gen only:\n" + new_gen_image_text.strip().removesuffix(",")
     fusion.text_learnset = file_text
     fusion.image_learnset = image_text
-    fusion.embed_learnset = f"Due to embed character limits, please use file or image view, or use the following command:\n*/pokedex move filters: learned by {pokemon1.name} | learned by {pokemon2.name}*"
+    fusion.embed_learnset = f"Due to embed character limits, please use file view, or use the following command:\n*/pokedex move filters: learned by {pokemon1.name} | learned by {pokemon2.name}*"
     fusion.color = pokemon1.color
     fusion.get_stats_text()
     return [command_text, fusion]

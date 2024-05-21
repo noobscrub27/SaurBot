@@ -3,7 +3,7 @@ import fnf_data
 import discord
 from discord.ext import commands
 from discord import app_commands
-import enum
+import datetime
 
 @app_commands.guild_only()
 class ConfigCog(commands.GroupCog, group_name="config"):
@@ -11,6 +11,7 @@ class ConfigCog(commands.GroupCog, group_name="config"):
         self.bot = bot
 
     trigger_group = app_commands.Group(name="trigger", description="Manage the likelihood that Saurbot will respond to certain triggers. Requires permission.")
+    suggestions_group = app_commands.Group(name="suggestions", description="Set up the ability for members to suggest things, or view suggestions. Requires permission.")
 
     @app_commands.command(name="promote")
     @app_commands.check(fnf_data.check_saurbot_permissions)
@@ -260,6 +261,92 @@ class ConfigCog(commands.GroupCog, group_name="config"):
 
     @command_trigger_list.error
     async def command_trigger_list_error(self, interaction: discord.Interaction, error):
+        await fnf_data.ephemeral_error_message(interaction, error)
+
+    @suggestions_group.command(name="setup")
+    @app_commands.check(fnf_data.check_saurbot_permissions)
+    async def command_suggestions_setup(self, interaction: discord.Interaction,
+                                   anonymous: bool,
+                                   autoreport: bool):
+        """Set up suggestions for this server. Requires permission.
+
+        Parameters
+        -----------
+        anonymous: bool
+            Whether anonymous suggestions are allowed.
+        autoreport: bool
+            If True, whenever a new suggestion is received, Saurbot will report it in this channel.
+        """
+        guild_id = interaction.guild_id
+        user_id = interaction.user.id
+        self.bot.create_guild_user_profile(interaction.guild, user_id)
+        now = datetime.datetime.now().timestamp()
+        if autoreport and fnf_data.guild_preferences[guild_id].user_profiles[user_id].suggestion_setup_warning_timestamp < now - 3600:
+                await interaction.response.send_message(f"Suggestions that members of this server make will be visible to all members in this channel. This includes anonymous suggestions. If you are sure this is the right channel, run this command again. This warning will not appear for the next hour.", ephemeral=True)
+                fnf_data.guild_preferences[guild_id].user_profiles[user_id].suggestion_setup_warning_timestamp = now
+                return
+        fnf_data.guild_preferences[guild_id].suggestion_settings["channel_id"] = interaction.channel_id
+        fnf_data.guild_preferences[guild_id].suggestion_settings["anonymous"] = anonymous
+        fnf_data.guild_preferences[guild_id].suggestion_settings["autoreport"] = autoreport
+        self.bot.write_preferences()
+        await interaction.response.send_message(f"Suggestions have been successfully configured!", ephemeral=True)
+
+    @command_suggestions_setup.error
+    async def command_suggestions_setup_error(self, interaction: discord.Interaction, error):
+        await fnf_data.ephemeral_error_message(interaction, error)
+
+    @suggestions_group.command(name="disable", description="Disables suggestions for this server. Requires permission")
+    @app_commands.check(fnf_data.check_saurbot_permissions)
+    async def command_suggestions_disable(self, interaction: discord.Interaction):
+        user_id = interaction.user.id
+        guild_id = interaction.guild_id
+        self.bot.create_guild_user_profile(interaction.guild, user_id)
+        if fnf_data.guild_preferences[guild_id].suggestion_settings["channel_id"] == 0:
+            await interaction.response.send_message(f"Suggestions are already disabled for this server.", ephemeral=True)
+        else:
+            fnf_data.guild_preferences[guild_id].suggestion_settings["channel_id"] = 0
+        await interaction.response.send_message(f"Suggestions have been disabled.", ephemeral=True)
+        self.bot.write_preferences()
+
+    @command_suggestions_disable.error
+    async def command_suggestions_disable_error(self, interaction: discord.Interaction, error):
+        await fnf_data.ephemeral_error_message(interaction, error)
+
+    @suggestions_group.command(name="view", description="View suggestion inbox. Requires permission")
+    @app_commands.check(fnf_data.check_saurbot_permissions)
+    async def command_suggestions_view(self, interaction: discord.Interaction):
+        user_id = interaction.user.id
+        guild_id = interaction.guild_id
+        self.bot.create_guild_user_profile(interaction.guild, user_id)
+        suggestion_channel_id = fnf_data.guild_preferences[guild_id].suggestion_settings["channel_id"]
+        if len(fnf_data.guild_preferences[guild_id].suggestion_box) == 0:
+            await interaction.response.send_message(f"The suggestion box is empty.")
+        else:
+            text = ""
+            for suggestion in fnf_data.guild_preferences[guild_id].suggestion_box:
+                text += f"{suggestion['time']} Suggested by {suggestion['username']}:\n    {suggestion['suggestion']}\n"
+            await interaction.response.send_message("", file=self.bot.turn_into_file(text), ephemeral=True if interaction.channel_id != suggestion_channel_id else False)
+        
+    @command_suggestions_view.error
+    async def command_suggestions_view_error(self, interaction: discord.Interaction, error):
+        await fnf_data.ephemeral_error_message(interaction, error)
+
+    @app_commands.command(name="points_channel", description="Sets the current channel to be the points channel. Requires permission.")
+    @app_commands.check(fnf_data.check_saurbot_permissions)
+    async def command_points_channel(self, interaction: discord.Interaction):
+        guild_id = interaction.guild_id
+        user_id = interaction.user.id
+        self.bot.create_guild_user_profile(interaction.guild, user_id)
+        if fnf_data.guild_preferences[guild_id].points_channel_id == interaction.channel_id:
+            fnf_data.guild_preferences[guild_id].points_channel_id = None
+            await interaction.response.send_message(f"This channel is no longer set as the points channel.", ephemeral=True)
+        else:
+            fnf_data.guild_preferences[guild_id].points_channel_id = interaction.channel_id
+            await interaction.response.send_message(f"This channel has been set as the points channel. Use this command in this channel again to undo.", ephemeral=True)
+        self.bot.write_preferences()
+
+    @command_points_channel.error
+    async def command_command_points_channel_error(self, interaction: discord.Interaction, error):
         await fnf_data.ephemeral_error_message(interaction, error)
             
 async def setup(bot: commands.Bot):
