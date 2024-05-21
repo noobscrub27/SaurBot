@@ -8,8 +8,8 @@ There are several major features that Saurbot provides:
 - A user profile system that allows server admins to assign users points, as well as other customizable options added at the request of FnF server members.
 - There's also a few commands for Mario Kart players, such as a friend code tracker and a random character selecter.
 
-WIP features that I want to add to the next update when I get the time:
-- The replay analyzer. This is a program that reads FnF Showdown replay files and adds the results to a searchable database. This for the purpose of analyzing performance over time to inform balance decisions.
+WIP features:
+- The replay analyzer. This is a program that reads FnF Showdown replay files and adds the results to a searchable database. The replays are automatically collected by a seperate bot that logs into FnF Showdown. This feature is nearly complete, and the goal is to use it to inform balance decisions.
 
 You're free to use this code for your own projects, although I'd appreciate credit where it's due. Please don't use this code for commercial purposes.
 For questions and suggestions, don't be shy to contact noobscrub on discord!
